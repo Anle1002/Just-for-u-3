@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Neon Snowflake Tree</title>
+    <title>Magic Hand - Clear & Sharp Edition</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -13,15 +13,14 @@
 
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Arial, sans-serif; }
-        #bg-image { position: fixed; inset: 0; background-image: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; filter: brightness(0.1) blur(10px); z-index: -1; }
-        #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; transition: 0.8s; text-align: center; }
-        #start-btn { padding: 18px 45px; border-radius: 40px; border: 2px solid #fff; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 1.3rem; cursor: pointer; transition: 0.3s; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
-        #start-btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
+        #bg-image { position: fixed; inset: 0; background-image: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; filter: brightness(0.15); z-index: -1; }
+        #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; transition: 0.8s; }
+        #start-btn { padding: 15px 40px; border-radius: 5px; border: 1px solid #fff; background: none; color: #fff; font-size: 1.1rem; cursor: pointer; transition: 0.3s; }
+        #start-btn:hover { background: #fff; color: #000; }
         #ui-layer { position: absolute; top: 30px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; }
-        #instructions { background: rgba(255, 255, 255, 0.1); padding: 12px 25px; border-radius: 30px; backdrop-filter: blur(10px); opacity: 0; border: 1px solid rgba(255,255,255,0.2); font-weight: 500; }
-        #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.2); transform: scaleX(-1); }
+        #instructions { background: rgba(0, 0, 0, 0.5); padding: 10px 20px; border-radius: 4px; opacity: 0; border: 1px solid rgba(255,255,255,0.3); }
+        #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; border: 1px solid #444; transform: scaleX(-1); }
         video { width: 100%; height: 100%; object-fit: cover; }
-        #yt-player-container { position: absolute; top: -1000px; left: -1000px; }
     </style>
 </head>
 <body>
@@ -30,13 +29,12 @@
     <div id="yt-player-container"><div id="player"></div></div>
 
     <div id="start-overlay">
-        <h1 style="font-size: 3rem; margin-bottom: 10px;">NEON XMAS MAGIC</h1>
-        <p style="margin-bottom: 30px; color: #00d4ff; letter-spacing: 1px;">Nắm tay để triệu hồi cây thông & Bông tuyết</p>
-        <button id="start-btn">Khám Phá Phép Màu</button>
+        <h1 style="font-weight: 300; letter-spacing: 5px;">THE MAGIC TREE</h1>
+        <button id="start-btn">BẮT ĐẦU TRẢI NGHIỆM</button>
     </div>
 
     <div id="ui-layer">
-        <div id="instructions">NẮM TAY để lắp ráp...</div>
+        <div id="instructions">NẮM TAY ĐỂ TẠO HÌNH</div>
     </div>
 
     <div id="video-container">
@@ -44,7 +42,7 @@
     </div>
 
     <script>
-        const PARTICLE_COUNT = 25000; // Tăng mật độ hạt đáng kể
+        const PARTICLE_COUNT = 30000; // Tăng số lượng hạt để dày đặc nhưng sắc nét
         let scene, camera, renderer, particles, snowflake, ytPlayer;
         let handTracker, videoElement;
         let assemblyFactor = 0, targetAssembly = 0;
@@ -64,6 +62,19 @@
             init();
         };
 
+        // Tạo texture hình tròn cho hạt sắc nét hơn
+        function createCircleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath();
+            ctx.arc(32, 32, 30, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+
         async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -74,48 +85,43 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
             
-            createParticles();
-            createSnowflake();
+            createSharpParticles();
+            createRealisticSnowflake();
             
             await setupMediaPipe();
             gsap.ticker.add(render);
             window.addEventListener('resize', onWindowResize);
         }
 
-        function createParticles() {
+        function createSharpParticles() {
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3);
-            const tar = new Float32Array(PARTICLE_COUNT * 3);
-            const chos = new Float32Array(PARTICLE_COUNT * 3);
-            const cols = new Float32Array(PARTICLE_COUNT * 3);
+            const pos = new Float32Array(PARTICLE_COUNT * 3), tar = new Float32Array(PARTICLE_COUNT * 3);
+            const chos = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // CÂY THÔNG (DÀY ĐẶC)
+                // CÂY THÔNG
                 const h = Math.random() * 6 - 3; 
-                const radTree = ((3 - h) / 6) * 2.2; 
+                const radTree = ((3 - h) / 6) * 2.3; 
                 const angTree = Math.random() * Math.PI * 2;
                 tar[i*3] = Math.cos(angTree) * radTree; 
                 tar[i*3+1] = h; 
                 tar[i*3+2] = Math.sin(angTree) * radTree;
 
-                // GALAXY (XOẮN ỐC - KHÔNG THƯA THỚT)
+                // GALAXY XOẮN ỐC (DÀY ĐẶC NHƯNG KHÔNG LOÃNG)
                 const angle = Math.random() * Math.PI * 2;
-                const radius = Math.pow(Math.random(), 0.4) * 9; // Hạt tập trung tâm hơn
-                const spiral = radius * 0.7;
+                const radius = Math.pow(Math.random(), 0.5) * 12;
+                const spiral = radius * 0.5;
                 chos[i*3] = Math.cos(angle + spiral) * radius; 
-                chos[i*3+1] = (Math.random() - 0.5) * (5 / (radius + 1)); 
+                chos[i*3+1] = (Math.random() - 0.5) * (6 / (radius + 1)); 
                 chos[i*3+2] = Math.sin(angle + spiral) * radius;
 
-                // MÀU SẮC NEON
+                // MÀU SẮC RÕ RÀNG
                 const c = new THREE.Color();
                 const rand = Math.random();
-                if (rand > 0.96) {
-                    c.setHex(0xffffff); // Tuyết trắng
-                } else if (rand > 0.75) {
-                    c.setHSL(0.55, 1.0, 0.6); // Neon Blue
-                } else {
-                    c.setHSL(0.35 + Math.random()*0.1, 1.0, 0.4); // Neon Green
-                }
+                if (rand > 0.9) c.setHex(0xffffff); // Hạt trắng
+                else if (rand > 0.5) c.setHex(0x2ecc71); // Xanh lá đậm
+                else c.setHex(0x27ae60); // Xanh lá vừa
+                
                 cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
             }
 
@@ -124,34 +130,49 @@
             geo.setAttribute('chaos', new THREE.BufferAttribute(chos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             
-            // Texture sáng lấp lánh (sử dụng size & blending)
-            const mat = new THREE.PointsMaterial({ 
-                size: 0.05, 
+            // Chế độ vật liệu Standard (không Blending rực rỡ)
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({ 
+                size: 0.035, 
                 vertexColors: true, 
-                blending: THREE.AdditiveBlending, 
+                map: createCircleTexture(),
                 transparent: true,
-                opacity: 0.9 
-            });
-            particles = new THREE.Points(geo, mat);
+                opacity: 0.9,
+                alphaTest: 0.1 
+            }));
             scene.add(particles);
         }
 
-        function createSnowflake() {
+        function createRealisticSnowflake() {
             snowflake = new THREE.Group();
-            const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, linewidth: 2 });
-            
-            for (let i = 0; i < 6; i++) {
-                const arm = new THREE.Group();
-                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.8,0)]), mat);
-                arm.add(line);
-                
-                for(let j=1; j<=2; j++){
-                    const branch1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, j*0.25, 0), new THREE.Vector3(0.2, j*0.25+0.15, 0)]), mat);
-                    const branch2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, j*0.25, 0), new THREE.Vector3(-0.2, j*0.25+0.15, 0)]), mat);
-                    arm.add(branch1, branch2);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0 });
+
+            const createBranch = () => {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.lineTo(0.04, 0.1);
+                shape.lineTo(0.01, 0.7);
+                shape.lineTo(0, 0.75);
+                shape.lineTo(-0.01, 0.7);
+                shape.lineTo(-0.04, 0.1);
+                shape.closePath();
+
+                const main = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+                for(let i=0; i<3; i++) {
+                    const sub = main.clone();
+                    sub.scale.set(0.3, 0.3, 1);
+                    sub.position.set(0, 0.2 + i*0.2, 0);
+                    sub.rotation.z = Math.PI/4;
+                    const sub2 = sub.clone();
+                    sub2.rotation.z = -Math.PI/4;
+                    main.add(sub, sub2);
                 }
-                arm.rotation.z = (i * Math.PI * 2) / 6;
-                snowflake.add(arm);
+                return main;
+            };
+
+            for (let i = 0; i < 6; i++) {
+                const b = createBranch();
+                b.rotation.z = (i * Math.PI * 2) / 6;
+                snowflake.add(b);
             }
             snowflake.position.y = 3.3;
             scene.add(snowflake);
@@ -160,54 +181,36 @@
         async function setupMediaPipe() {
             videoElement = document.getElementById('webcam');
             handTracker = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-            handTracker.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
-            handTracker.onResults(onHandResults);
+            handTracker.setOptions({ maxNumHands: 1, modelComplexity: 1 });
+            handTracker.onResults(results => {
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const lm = results.multiHandLandmarks[0];
+                    targetAssembly = (lm[8].y > lm[6].y && lm[12].y > lm[10].y) ? 1 : 0;
+                } else { targetAssembly = 0; }
+            });
             new Camera(videoElement, { onFrame: async () => await handTracker.send({ image: videoElement }), width: 640, height: 480 }).start();
-        }
-
-        function onHandResults(results) {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const lm = results.multiHandLandmarks[0];
-                const isFist = lm[8].y > lm[6].y && lm[12].y > lm[10].y && lm[16].y > lm[14].y;
-                targetAssembly = isFist ? 1 : 0;
-                document.getElementById('instructions').innerHTML = isFist ? "✨ PHÉP MÀU ĐANG TỎA SÁNG ✨" : "Xòe tay để tung ngân hà!";
-            } else {
-                targetAssembly = 0;
-            }
         }
 
         function render() {
             assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.07);
-            if(ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(20 + assemblyFactor * 60);
-
             const p = particles.geometry.attributes.position;
             const t = particles.geometry.attributes.target;
             const c = particles.geometry.attributes.chaos;
-            const time = Date.now() * 0.001;
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
-                // Xoay ngân hà khi bung ra
-                const rotSpeed = time * 0.2;
-                const radius = Math.sqrt(c.array[ix]**2 + c.array[iz]**2);
-                const currAngle = Math.atan2(c.array[iz], c.array[ix]) + rotSpeed;
-
-                const bx = Math.cos(currAngle) * radius;
-                const bz = Math.sin(currAngle) * radius;
-
-                p.array[ix] = THREE.MathUtils.lerp(bx, t.array[ix], assemblyFactor);
+                p.array[ix] = THREE.MathUtils.lerp(c.array[ix], t.array[ix], assemblyFactor);
                 p.array[iy] = THREE.MathUtils.lerp(c.array[iy], t.array[iy], assemblyFactor);
-                p.array[iz] = THREE.MathUtils.lerp(bz, t.array[iz], assemblyFactor);
+                p.array[iz] = THREE.MathUtils.lerp(c.array[iz], t.array[iz], assemblyFactor);
             }
             p.needsUpdate = true;
-            particles.rotation.y += 0.003;
+            particles.rotation.y += 0.002;
 
             if(snowflake) {
-                snowflake.scale.setScalar(assemblyFactor * 1.2);
-                snowflake.rotation.z -= 0.01;
+                snowflake.scale.setScalar(assemblyFactor * 1.3);
+                snowflake.rotation.y += 0.03; 
                 snowflake.traverse(child => { if(child.material) child.material.opacity = assemblyFactor; });
             }
-
             renderer.render(scene, camera);
         }
 
