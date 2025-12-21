@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Perfect Heart & Snow</title>
+    <title>Magic Hand - Colorful Tree & Heart</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -29,7 +29,7 @@
 
     <script>
         const PARTICLE_COUNT = 25000;
-        let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
+        let scene, camera, renderer, particles, snowflake, ytPlayer;
         let handTracker, videoElement, mainGroup;
         let fHeart = 0, fGalaxy = 0;
         let tHeart = 0, tGalaxy = 0;
@@ -77,7 +77,7 @@
                 const group = new THREE.Group();
                 const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
                 
-                // depthTest: false để ảnh không bị hạt che
+                // depthTest: false để hạt bụi không đè lên ảnh
                 const photoMat = new THREE.MeshBasicMaterial({ map: loader.load(proxyUrl), transparent: true, opacity: 0, depthTest: false });
                 const borderMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0, depthTest: false });
                 
@@ -99,43 +99,50 @@
 
         function createParticles() {
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3), tS = new Float32Array(PARTICLE_COUNT * 3), tH = new Float32Array(PARTICLE_COUNT * 3), tG = new Float32Array(PARTICLE_COUNT * 3);
-            
+            const pos = new Float32Array(PARTICLE_COUNT * 3), tS = new Float32Array(PARTICLE_COUNT * 3), tH = new Float32Array(PARTICLE_COUNT * 3), tG = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
+            const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x333333]; // Vàng, Xanh lá, Trắng, Đỏ, Đen
+
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // Cấu trúc cây thông cũ
+                // 1. Cấu trúc CÂY THÔNG (Snowflake Tree)
                 const h = Math.random() * 6 - 3;
                 const rT = ((3 - h) / 6) * 2.3;
                 const aT = Math.random() * Math.PI * 2;
                 tS[i*3] = Math.cos(aT)*rT; tS[i*3+1] = h; tS[i*3+2] = Math.sin(aT)*rT;
 
-                // Cấu trúc trái tim
+                // 2. Cấu trúc TRÁI TIM
                 const t = Math.random() * Math.PI * 2;
                 const hX = 16 * Math.pow(Math.sin(t), 3), hY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
                 tH[i*3] = hX * 0.35; tH[i*3+1] = hY * 0.35; tH[i*3+2] = (Math.random()-0.5)*2;
 
-                // Cấu trúc dải ngân hà
+                // 3. Cấu trúc GALAXY
                 const aG = Math.random() * Math.PI * 2, rG = 7 + Math.random() * 3;
                 tG[i*3] = Math.cos(aG)*rG; tG[i*3+1] = (Math.random()-0.5)*6; tG[i*3+2] = Math.sin(aG)*rG;
+
+                // MÀU SẮC (Khôi phục 5 màu của bạn)
+                const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+                cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('tS', new THREE.BufferAttribute(tS, 3));
             geo.setAttribute('tH', new THREE.BufferAttribute(tH, 3));
             geo.setAttribute('tG', new THREE.BufferAttribute(tG, 3));
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.035, color: 0xffffff, transparent: true, opacity: 0.6 }));
+            geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+            
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, transparent: true, opacity: 0.8 }));
             mainGroup.add(particles);
         }
 
         function createSnowflake() {
-            snowflakeGroup = new THREE.Group();
+            snowflake = new THREE.Group();
             const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, side: THREE.DoubleSide });
-            for(let i=0; i<6; i++) {
-                const b = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 1), mat);
-                b.rotation.z = (i * Math.PI) / 3;
-                snowflakeGroup.add(b);
+            // Tạo bông tuyết 6 cánh truyền thống
+            for(let i=0; i<3; i++) {
+                const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 1.2), mat);
+                bar.rotation.z = (i * Math.PI) / 3;
+                snowflake.add(bar);
             }
-            snowflakeGroup.position.y = 3.3; 
-            snowflakeGroup.scale.setScalar(0.6);
-            scene.add(snowflakeGroup);
+            snowflake.position.y = 3.3; // Đặt trên đỉnh cây thông
+            scene.add(snowflake);
         }
 
         async function setupMediaPipe() {
@@ -179,9 +186,10 @@
                 pair.borderMat.opacity = Math.max(fHeart, fGalaxy);
             });
 
-            if (snowflakeGroup) {
-                snowflakeGroup.visible = (fHeart < 0.1 && fGalaxy < 0.1);
-                snowflakeGroup.rotation.z += 0.01;
+            if (snowflake) {
+                // Chỉ hiện bông tuyết khi cây thông đang khép lại
+                snowflake.visible = (fHeart < 0.1 && fGalaxy < 0.1);
+                snowflake.rotation.z += 0.02;
             }
             renderer.render(scene, camera);
         }
