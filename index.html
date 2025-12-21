@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Giant Particles Edition</title>
+    <title>Magic Hand - Ultimate Crystal Snowflake</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -63,7 +63,7 @@
 
             createParticles();
             createPhotos();
-            createArtisticSnowflake();
+            createUltimateSnowflake(); // Hàm tạo bông tuyết mới
             
             await setupMediaPipe();
             gsap.ticker.add(render);
@@ -124,33 +124,58 @@
             geo.setAttribute('tG', new THREE.BufferAttribute(tG, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             
-            // KÍCH THƯỚC HẠT ĐƯỢC TĂNG LÊN 0.15 TẠI ĐÂY
             particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.15, vertexColors: true, transparent: true, opacity: 0.85 }));
             mainGroup.add(particles);
         }
 
-        function createArtisticSnowflake() {
+        function createUltimateSnowflake() {
             snowflakeGroup = new THREE.Group();
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true });
-            const createBranch = () => {
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide });
+            
+            // Hàm tạo một cánh hoa văn phức tạp
+            const createComplexBranch = () => {
                 const branch = new THREE.Group();
-                const mainLine = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 1.2), mat);
-                mainLine.position.y = 0.6;
-                branch.add(mainLine);
+                
+                // Trục chính
+                const main = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 1.4), mat);
+                main.position.y = 0.7;
+                branch.add(main);
+                
+                // Mảnh kim cương ở giữa nhánh
+                const diamond = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15), mat);
+                diamond.rotation.z = Math.PI / 4;
+                diamond.position.y = 0.6;
+                branch.add(diamond);
+
+                // Các gai phụ đối xứng
                 for(let i=1; i<=3; i++) {
-                    const side = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.4), mat);
-                    side.position.y = i * 0.25; side.rotation.z = Math.PI / 4;
-                    const side2 = side.clone(); side2.rotation.z = -Math.PI / 4;
-                    branch.add(side, side2);
+                    const pos = i * 0.35;
+                    const len = 0.5 - (i * 0.1);
+                    const left = new THREE.Mesh(new THREE.PlaneGeometry(0.02, len), mat);
+                    left.position.set(-len/4, pos, 0);
+                    left.rotation.z = Math.PI / 4;
+                    const right = left.clone();
+                    right.position.x = len/4;
+                    right.rotation.z = -Math.PI / 4;
+                    branch.add(left, right);
                 }
                 return branch;
             };
+
+            // Tạo 6 cánh
             for (let i = 0; i < 6; i++) {
-                const b = createBranch();
+                const b = createComplexBranch();
                 b.rotation.z = (i * Math.PI) / 3;
                 snowflakeGroup.add(b);
             }
-            snowflakeGroup.position.y = 3.3; 
+
+            // Thêm vòng tròn tinh thể ở tâm
+            const centerGeo = new THREE.RingGeometry(0.08, 0.12, 6);
+            const centerRing = new THREE.Mesh(centerGeo, mat);
+            centerRing.rotation.z = Math.PI / 2;
+            snowflakeGroup.add(centerRing);
+
+            snowflakeGroup.position.y = 3.4;
             snowflakeGroup.scale.setScalar(0.7);
             scene.add(snowflakeGroup);
         }
