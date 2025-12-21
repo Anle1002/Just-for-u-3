@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Nắm & Mở</title>
+    <title>Magic Hand - Neon Snowflake Tree</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -13,11 +13,12 @@
 
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Arial, sans-serif; }
-        #bg-image { position: fixed; inset: 0; background-image: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; filter: brightness(0.2) blur(8px); z-index: -1; }
-        #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; transition: 0.8s; text-align: center; }
-        #start-btn { padding: 18px 45px; border-radius: 40px; border: 2px solid #f1c40f; background: rgba(241, 196, 15, 0.1); color: #f1c40f; font-size: 1.3rem; cursor: pointer; transition: 0.3s; font-weight: bold; }
+        #bg-image { position: fixed; inset: 0; background-image: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; filter: brightness(0.1) blur(10px); z-index: -1; }
+        #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; transition: 0.8s; text-align: center; }
+        #start-btn { padding: 18px 45px; border-radius: 40px; border: 2px solid #fff; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 1.3rem; cursor: pointer; transition: 0.3s; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+        #start-btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
         #ui-layer { position: absolute; top: 30px; width: 100%; text-align: center; color: white; pointer-events: none; z-index: 10; }
-        #instructions { background: rgba(255, 255, 255, 0.1); padding: 12px 25px; border-radius: 30px; backdrop-filter: blur(5px); opacity: 0; border: 1px solid rgba(255,255,255,0.2); }
+        #instructions { background: rgba(255, 255, 255, 0.1); padding: 12px 25px; border-radius: 30px; backdrop-filter: blur(10px); opacity: 0; border: 1px solid rgba(255,255,255,0.2); font-weight: 500; }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.2); transform: scaleX(-1); }
         video { width: 100%; height: 100%; object-fit: cover; }
         #yt-player-container { position: absolute; top: -1000px; left: -1000px; }
@@ -29,13 +30,13 @@
     <div id="yt-player-container"><div id="player"></div></div>
 
     <div id="start-overlay">
-        <h1>Phép Màu Trong Tầm Tay</h1>
-        <p style="margin-bottom: 30px; color: #aaa;">Nắm tay để gom cây thông • Xòe tay để tung ngân hà</p>
-        <button id="start-btn">Bắt Đầu</button>
+        <h1 style="font-size: 3rem; margin-bottom: 10px;">NEON XMAS MAGIC</h1>
+        <p style="margin-bottom: 30px; color: #00d4ff; letter-spacing: 1px;">Nắm tay để triệu hồi cây thông & Bông tuyết</p>
+        <button id="start-btn">Khám Phá Phép Màu</button>
     </div>
 
     <div id="ui-layer">
-        <div id="instructions">NẮM TAY lại để lắp ráp cây thông!</div>
+        <div id="instructions">NẮM TAY để lắp ráp...</div>
     </div>
 
     <div id="video-container">
@@ -43,10 +44,10 @@
     </div>
 
     <script>
-        const PARTICLE_COUNT = 10000;
-        let scene, camera, renderer, particles, starGroup, ytPlayer;
+        const PARTICLE_COUNT = 25000; // Tăng mật độ hạt đáng kể
+        let scene, camera, renderer, particles, snowflake, ytPlayer;
         let handTracker, videoElement;
-        let assemblyFactor = 0, targetAssembly = 0, handPositions = [];
+        let assemblyFactor = 0, targetAssembly = 0;
 
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('player', {
@@ -66,109 +67,147 @@
         async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 6;
+            camera.position.z = 7;
+
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
-            createTreeParticles();
-            createTopStar();
+            
+            createParticles();
+            createSnowflake();
+            
             await setupMediaPipe();
             gsap.ticker.add(render);
             window.addEventListener('resize', onWindowResize);
         }
 
-        function createTreeParticles() {
+        function createParticles() {
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3), tar = new Float32Array(PARTICLE_COUNT * 3);
-            const chos = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
+            const pos = new Float32Array(PARTICLE_COUNT * 3);
+            const tar = new Float32Array(PARTICLE_COUNT * 3);
+            const chos = new Float32Array(PARTICLE_COUNT * 3);
+            const cols = new Float32Array(PARTICLE_COUNT * 3);
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                const r = Math.random(), h = Math.random() * 5 - 2.5, rad = ((2.5-h)/5)*2, ang = Math.random()*Math.PI*2;
-                tar[i*3] = Math.cos(ang)*rad*r; tar[i*3+1] = h; tar[i*3+2] = Math.sin(ang)*rad*r;
-                const d = 4 + Math.random()*5, a = Math.random()*Math.PI*2;
-                chos[i*3] = Math.cos(a)*d; chos[i*3+1] = (Math.random()-0.5)*6; chos[i*3+2] = Math.sin(a)*d;
-                const c = new THREE.Color().setHSL(0.3 + Math.random()*0.1, 0.8, 0.4 + Math.random()*0.3);
-                if(Math.random() > 0.85) c.setHex(0xffd700); 
+                // CÂY THÔNG (DÀY ĐẶC)
+                const h = Math.random() * 6 - 3; 
+                const radTree = ((3 - h) / 6) * 2.2; 
+                const angTree = Math.random() * Math.PI * 2;
+                tar[i*3] = Math.cos(angTree) * radTree; 
+                tar[i*3+1] = h; 
+                tar[i*3+2] = Math.sin(angTree) * radTree;
+
+                // GALAXY (XOẮN ỐC - KHÔNG THƯA THỚT)
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.pow(Math.random(), 0.4) * 9; // Hạt tập trung tâm hơn
+                const spiral = radius * 0.7;
+                chos[i*3] = Math.cos(angle + spiral) * radius; 
+                chos[i*3+1] = (Math.random() - 0.5) * (5 / (radius + 1)); 
+                chos[i*3+2] = Math.sin(angle + spiral) * radius;
+
+                // MÀU SẮC NEON
+                const c = new THREE.Color();
+                const rand = Math.random();
+                if (rand > 0.96) {
+                    c.setHex(0xffffff); // Tuyết trắng
+                } else if (rand > 0.75) {
+                    c.setHSL(0.55, 1.0, 0.6); // Neon Blue
+                } else {
+                    c.setHSL(0.35 + Math.random()*0.1, 1.0, 0.4); // Neon Green
+                }
                 cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
             }
+
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('target', new THREE.BufferAttribute(tar, 3));
             geo.setAttribute('chaos', new THREE.BufferAttribute(chos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.035, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true }));
+            
+            // Texture sáng lấp lánh (sử dụng size & blending)
+            const mat = new THREE.PointsMaterial({ 
+                size: 0.05, 
+                vertexColors: true, 
+                blending: THREE.AdditiveBlending, 
+                transparent: true,
+                opacity: 0.9 
+            });
+            particles = new THREE.Points(geo, mat);
             scene.add(particles);
         }
 
-        function createTopStar() {
-            starGroup = new THREE.Group();
-            starGroup.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.35, 0), new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0 })));
-            starGroup.position.y = 2.75;
-            scene.add(starGroup);
+        function createSnowflake() {
+            snowflake = new THREE.Group();
+            const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, linewidth: 2 });
+            
+            for (let i = 0; i < 6; i++) {
+                const arm = new THREE.Group();
+                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0.8,0)]), mat);
+                arm.add(line);
+                
+                for(let j=1; j<=2; j++){
+                    const branch1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, j*0.25, 0), new THREE.Vector3(0.2, j*0.25+0.15, 0)]), mat);
+                    const branch2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, j*0.25, 0), new THREE.Vector3(-0.2, j*0.25+0.15, 0)]), mat);
+                    arm.add(branch1, branch2);
+                }
+                arm.rotation.z = (i * Math.PI * 2) / 6;
+                snowflake.add(arm);
+            }
+            snowflake.position.y = 3.3;
+            scene.add(snowflake);
         }
 
         async function setupMediaPipe() {
             videoElement = document.getElementById('webcam');
-            handTracker = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-            handTracker.setOptions({ maxNumHands: 1, modelComplexity: 1 }); // Chỉ cần 1 tay để điều khiển cho dễ
+            handTracker = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+            handTracker.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
             handTracker.onResults(onHandResults);
             new Camera(videoElement, { onFrame: async () => await handTracker.send({ image: videoElement }), width: 640, height: 480 }).start();
         }
 
         function onHandResults(results) {
-            handPositions = [];
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                
-                // KIỂM TRA TRẠNG THÁI NẮM TAY
-                // Nếu đầu ngón tay (8, 12, 16, 20) thấp hơn khớp giữa (6, 10, 14, 18) -> Nắm tay
-                const isFist = landmarks[8].y > landmarks[6].y && 
-                               landmarks[12].y > landmarks[10].y && 
-                               landmarks[16].y > landmarks[14].y;
-
+                const lm = results.multiHandLandmarks[0];
+                const isFist = lm[8].y > lm[6].y && lm[12].y > lm[10].y && lm[16].y > lm[14].y;
                 targetAssembly = isFist ? 1 : 0;
-
-                // Cập nhật hướng dẫn
-                const ins = document.getElementById('instructions');
-                ins.innerHTML = isFist ? "Đang giữ cây thông..." : "Xòe tay để tung ngân hà!";
-
-                handPositions.push(new THREE.Vector3((landmarks[8].x-0.5)*-12, (landmarks[8].y-0.5)*-8, 0));
+                document.getElementById('instructions').innerHTML = isFist ? "✨ PHÉP MÀU ĐANG TỎA SÁNG ✨" : "Xòe tay để tung ngân hà!";
             } else {
                 targetAssembly = 0;
             }
         }
 
         function render() {
-            assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.08);
+            assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.07);
             if(ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(20 + assemblyFactor * 60);
 
-            const p = particles.geometry.attributes.position, t = particles.geometry.attributes.target, c = particles.geometry.attributes.chaos;
+            const p = particles.geometry.attributes.position;
+            const t = particles.geometry.attributes.target;
+            const c = particles.geometry.attributes.chaos;
             const time = Date.now() * 0.001;
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
-                const ang = time * 0.2 + (i * 0.001), rad = Math.sqrt(c.array[ix]**2 + c.array[iz]**2);
-                
-                let dx = THREE.MathUtils.lerp(Math.cos(ang)*rad, t.array[ix], assemblyFactor);
-                let dy = THREE.MathUtils.lerp(c.array[iy], t.array[iy], assemblyFactor);
-                let dz = THREE.MathUtils.lerp(Math.sin(ang)*rad, t.array[iz], assemblyFactor);
+                // Xoay ngân hà khi bung ra
+                const rotSpeed = time * 0.2;
+                const radius = Math.sqrt(c.array[ix]**2 + c.array[iz]**2);
+                const currAngle = Math.atan2(c.array[iz], c.array[ix]) + rotSpeed;
 
-                // Hiệu ứng vuốt khi xòe tay
-                if (assemblyFactor < 0.5) {
-                    handPositions.forEach(h => {
-                        const dist = Math.sqrt((dx-h.x)**2 + (dy-h.y)**2);
-                        if(dist < 2.0) { dx += (dx-h.x)*(2.0-dist)*0.3; dy += (dy-h.y)*(2.0-dist)*0.3; }
-                    });
-                }
+                const bx = Math.cos(currAngle) * radius;
+                const bz = Math.sin(currAngle) * radius;
 
-                p.array[ix]=dx; p.array[iy]=dy; p.array[iz]=dz;
+                p.array[ix] = THREE.MathUtils.lerp(bx, t.array[ix], assemblyFactor);
+                p.array[iy] = THREE.MathUtils.lerp(c.array[iy], t.array[iy], assemblyFactor);
+                p.array[iz] = THREE.MathUtils.lerp(bz, t.array[iz], assemblyFactor);
             }
             p.needsUpdate = true;
-            particles.rotation.y += 0.002;
-            if(starGroup) { 
-                starGroup.scale.setScalar(assemblyFactor); 
-                starGroup.children[0].material.opacity = assemblyFactor;
-                starGroup.rotation.y += 0.05;
+            particles.rotation.y += 0.003;
+
+            if(snowflake) {
+                snowflake.scale.setScalar(assemblyFactor * 1.2);
+                snowflake.rotation.z -= 0.01;
+                snowflake.traverse(child => { if(child.material) child.material.opacity = assemblyFactor; });
             }
+
             renderer.render(scene, camera);
         }
 
