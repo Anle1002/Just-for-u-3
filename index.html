@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cây Thông Noel Nhiệm Màu - Interactive Experience</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background: #050a0f; font-family: 'Arial', sans-serif; }
+        canvas { display: block; }
+
+        /* Giao diện người dùng */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+            z-index: 10;
+        }
+
+        /* Màn hình chờ */
+        #loader {
+            position: fixed; inset: 0; background: #050a0f;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; transition: opacity 1s ease;
+        }
+
+        .spinner {
+            width: 50px; height: 50px; border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #e74c3c; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #instructions {
+            background: rgba(0, 0, 0, 0.6); padding: 15px 30px; border-radius: 50px;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
+            opacity: 0; transform: translateY(20px); transition: all 1s ease;
+            text-align: center; font-size: 1.2rem;
+        }
+
+        /* Khung hiển thị webcam nhỏ ở góc */
+        #video-container {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 200px; height: 150px; border-radius: 15px;
+            overflow: hidden; border: 2px solid rgba(255,255,255,0.3);
+            transform: scaleX(-1); /* Gương phản chiếu */
+        }
+
+        video { width: 100%; height: 100%; object-fit: cover; }
+
+        #error-msg {
+            display: none; color: #ff4d4d; background: rgba(0,0,0,0.8);
+            padding: 20px; border-radius: 10px; text-align: center; pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p>Đang thắp sáng phép màu Giáng sinh...</p>
+    </div>
+
+    <div id="ui-layer">
+        <div id="instructions">Chụm hai tay lại để lắp ráp cây thông</div>
+        <div id="error-msg">Không thể truy cập Camera. Vui lòng cấp quyền và tải lại trang.</div>
+    </div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <script>
+        /**
+         * CẤU HÌNH & BIẾN TOÀN CỤC
+         */
+        const PARTICLE_COUNT = 8000;
+        let scene, camera, renderer, particles;
+        let handTracker, videoElement;
+        let assemblyFactor = 0; // 0 = Hỗn loạn, 1 = Thành hình cây thông
+        let targetAssembly = 0;
+        
+        const colors = [new THREE.Color(0x2d5a27), new THREE.Color(0xCFB53B), new THREE.Color(0xff0000)];
+
+        /**
+         * KHỞI TẠO
+         */
+        async function init() {
+            setupThree();
+            createTreeParticles();
+            createSnow();
+            await setupMediaPipe();
+            
+            window.addEventListener('resize', onWindowResize);
+            gsap.ticker.add(render);
+            
+            // Tắt màn hình chờ
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loader').style.display = 'none';
+                gsap.to("#instructions", { opacity: 1, y: 0, duration: 1 });
+            }, 1000);
+        }
+
+        function setupThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050a0f, 0.05);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+        }
+
+        function createTreeParticles() {
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(PARTICLE_COUNT * 3);
+            const targetPos = new Float32Array(PARTICLE_COUNT * 3);
+            const chaosPos = new Float32Array(PARTICLE_COUNT * 3);
+            const colorsAttr = new Float32Array(PARTICLE_COUNT * 3);
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                // Mục tiêu: Hình nón (Cây thông)
+                const r = Math.random();
+                const h = Math.random() * 4 - 2;
+                const radiusAtH = ( (2 - h) / 4 ) * 1.5;
+                const angle = Math.random() * Math.PI * 2;
+
+                targetPos[i * 3] = Math.cos(angle) * radiusAtH * r;
+                targetPos[i * 3 + 1] = h;
+                targetPos[i * 3 + 2] = Math.sin(angle) * radiusAtH * r;
+
+                // Hỗn loạn: Hình cầu ngẫu nhiên
+                chaosPos[i * 3] = (Math.random() - 0.5) * 10;
+                chaosPos[i * 3 + 1] = (Math.random() - 0.5) * 10;
+                chaosPos[i * 3 + 2] = (Math.random() - 0.5) * 10;
+
+                // Vị trí ban đầu
+                positions[i * 3] = chaosPos[i * 3];
+                positions[i * 3 + 1] = chaosPos[i * 3 + 1];
+                positions[i * 3 + 2] = chaosPos[i * 3 + 2];
+
+                // Màu sắc ngẫu nhiên xanh, vàng, đỏ
+                const col = colors[Math.floor(Math.random() * colors.length)];
+                colorsAttr[i * 3] = col.r;
+                colorsAttr[i * 3 + 1] = col.g;
+                colorsAttr[i * 3 + 2] = col.b;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geo.setAttribute('target', new THREE.BufferAttribute(targetPos, 3));
+            geo.setAttribute('chaos', new THREE.BufferAttribute(chaosPos, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(colorsAttr, 3));
+
+            const mat = new THREE.PointsMaterial({
+                size: 0.04,
+                vertexColors: true,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                opacity: 0.8
+            });
+
+            particles = new THREE.Points(geo, mat);
+            scene.add(particles);
+        }
+
+        function createSnow() {
+            const snowGeo = new THREE.BufferGeometry();
+            const count = 1000;
+            const pos = new Float32Array(count * 3);
+            for(let i=0; i<count*3; i++) pos[i] = (Math.random() - 0.5) * 20;
+            snowGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const snowMat = new THREE.PointsMaterial({ size: 0.02, color: 0xffffff, transparent: true, opacity: 0.5 });
+            const snow = new THREE.Points(snowGeo, snowMat);
+            scene.add(snow);
+            
+            gsap.to(snow.rotation, { y: Math.PI * 2, duration: 100, repeat: -1, ease: "none" });
+        }
+
+        /**
+         * XỬ LÝ NHẬN DIỆN BẰNG MEDIAPIPE
+         */
+        async function setupMediaPipe() {
+            videoElement = document.getElementById('webcam');
+            
+            handTracker = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            handTracker.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            handTracker.onResults(onHandResults);
+
+            const cameraPipe = new Camera(videoElement, {
+                onFrame: async () => { await handTracker.send({ image: videoElement }); },
+                width: 640, height: 480
+            });
+
+            try {
+                await cameraPipe.start();
+            } catch (e) {
+                document.getElementById('error-msg').style.display = 'block';
+            }
+        }
+
+        function onHandResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
+                // Lấy vị trí đầu ngón tay trỏ (Landmark 8) của 2 tay
+                const h1 = results.multiHandLandmarks[0][8];
+                const h2 = results.multiHandLandmarks[1][8];
+                
+                // Tính khoảng cách Euclidean
+                const dist = Math.sqrt(
+                    Math.pow(h1.x - h2.x, 2) + 
+                    Math.pow(h1.y - h2.y, 2)
+                );
+
+                // Bản đồ hóa khoảng cách: Càng gần càng lắp ráp nhanh
+                // dist 0.1 (rất gần) -> 1 (lắp ráp xong), dist 0.5 (xa) -> 0 (tan biến)
+                targetAssembly = THREE.MathUtils.clamp(gsap.utils.mapRange(0.1, 0.5, 1, 0, dist), 0, 1);
+            } else {
+                // Nếu không thấy tay hoặc chỉ thấy 1 tay, cây thông từ từ tan biến
+                targetAssembly = THREE.MathUtils.lerp(targetAssembly, 0, 0.05);
+            }
+        }
+
+        /**
+         * VÒNG LẶP RENDER (60 FPS)
+         */
+        function render() {
+            // Nội suy mượt mà giá trị assembly
+            assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.07);
+
+            const posAttr = particles.geometry.attributes.position;
+            const targetAttr = particles.geometry.attributes.target;
+            const chaosAttr = particles.geometry.attributes.chaos;
+
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
+
+                // Di chuyển hạt dựa trên assemblyFactor
+                posAttr.array[ix] = THREE.MathUtils.lerp(chaosAttr.array[ix], targetAttr.array[ix], assemblyFactor);
+                posAttr.array[iy] = THREE.MathUtils.lerp(chaosAttr.array[iy], targetAttr.array[iy], assemblyFactor);
+                posAttr.array[iz] = THREE.MathUtils.lerp(chaosAttr.array[iz], targetAttr.array[iz], assemblyFactor);
+
+                // Hiệu ứng bập bềnh nhẹ khi đang ở trạng thái hỗn loạn
+                if (assemblyFactor < 0.9) {
+                    posAttr.array[ix] += Math.sin(Date.now() * 0.001 + i) * 0.002;
+                    posAttr.array[iy] += Math.cos(Date.now() * 0.001 + i) * 0.002;
+                }
+            }
+
+            posAttr.needsUpdate = true;
+            particles.rotation.y += 0.005; // Xoay cây thông nhẹ nhàng
+            
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>
