@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Artistic Snowflake Edition</title>
+    <title>Magic Hand - Real Galaxy Edition</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -28,7 +28,7 @@
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
-        const PARTICLE_COUNT = 25000;
+        const PARTICLE_COUNT = 30000; // Tăng thêm hạt cho Galaxy dày hơn
         let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
         let handTracker, videoElement, mainGroup;
         let fHeart = 0, fGalaxy = 0;
@@ -63,7 +63,7 @@
 
             createParticles();
             createPhotos();
-            createArtisticSnowflake(); // Tạo bông tuyết đẹp
+            createArtisticSnowflake();
             
             await setupMediaPipe();
             gsap.ticker.add(render);
@@ -81,9 +81,12 @@
                 const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), photoMat);
                 photo.position.z = 0.01; 
                 group.add(border); group.add(photo);
-                const angle = (i / 8) * Math.PI * 2;
+
+                // Tọa độ Galaxy cho ảnh (Xếp theo xoáy ốc)
+                const angle = (i / 8) * Math.PI * 4;
+                const dist = 3 + (i * 0.5);
                 group.userData = {
-                    posGalaxy: new THREE.Vector3(Math.cos(angle)*5.8, (Math.random()-0.5)*2, Math.sin(angle)*5.8),
+                    posGalaxy: new THREE.Vector3(Math.cos(angle)*dist, (Math.random()-0.5)*2, Math.sin(angle)*dist),
                     posHeart: new THREE.Vector3(((i % 4) - 1.5) * 1.5, (Math.floor(i / 4) - 0.5) * -1.5, 0)
                 };
                 mainGroup.add(group);
@@ -97,15 +100,26 @@
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111]; 
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
+                // 1. CÂY THÔNG
                 const h = Math.random() * 6 - 3;
                 const rT = ((3 - h) / 6) * 2.3;
                 const aT = Math.random() * Math.PI * 2;
                 tS[i*3] = Math.cos(aT)*rT; tS[i*3+1] = h; tS[i*3+2] = Math.sin(aT)*rT;
+
+                // 2. TRÁI TIM
                 const t = Math.random() * Math.PI * 2;
                 const hX = 16 * Math.pow(Math.sin(t), 3), hY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
                 tH[i*3] = hX * 0.38; tH[i*3+1] = hY * 0.38; tH[i*3+2] = (Math.random()-0.5)*2;
-                const aG = Math.random() * Math.PI * 2, rG = 7 + Math.random() * 3;
-                tG[i*3] = Math.cos(aG)*rG; tG[i*3+1] = (Math.random()-0.5)*6; tG[i*3+2] = Math.sin(aG)*rG;
+
+                // 3. VŨ TRỤ NGÂN HÀ (Xoáy ốc có chiều sâu)
+                const branch = Math.floor(Math.random() * 3); // 3 nhánh xoáy
+                const angle = Math.random() * Math.PI * 8;
+                const dist = (Math.random() * 8) + (angle * 0.2);
+                const noise = (Math.random() - 0.5) * 1.5;
+                tG[i*3] = Math.cos(angle + (branch * Math.PI * 2 / 3)) * dist + noise;
+                tG[i*3+1] = (Math.random() - 0.5) * (10 / (dist + 1)); // Đĩa dẹt dần ra ngoài
+                tG[i*3+2] = Math.sin(angle + (branch * Math.PI * 2 / 3)) * dist + noise;
+
                 const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
                 cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
             }
@@ -121,7 +135,6 @@
         function createArtisticSnowflake() {
             snowflakeGroup = new THREE.Group();
             const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true });
-            
             const createBranch = () => {
                 const branch = new THREE.Group();
                 const mainLine = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 1.2), mat);
@@ -135,7 +148,6 @@
                 }
                 return branch;
             };
-
             for (let i = 0; i < 6; i++) {
                 const b = createBranch();
                 b.rotation.z = (i * Math.PI) / 3;
@@ -153,9 +165,9 @@
             handTracker.onResults(res => {
                 if (res.multiHandLandmarks && res.multiHandLandmarks[0]) {
                     const lm = res.multiHandLandmarks[0];
-                    const up1 = lm[8].y < lm[6].y, up2 = lm[12].y < lm[10].y;
-                    if (up1 && !up2) { tHeart = 1; tGalaxy = 0; }
-                    else if (up1 && up2) { tHeart = 0; tGalaxy = 1; }
+                    const up1 = lm[8].y < lm[6].y, up2 = lm[12].y < lm[10].y, up3 = lm[16].y < lm[14].y;
+                    if (up1 && !up2 && !up3) { tHeart = 1; tGalaxy = 0; }
+                    else if (up1 && up2 && up3) { tHeart = 0; tGalaxy = 1; }
                     else { tHeart = 0; tGalaxy = 0; }
                 } else { tHeart = 0; tGalaxy = 0; }
             });
@@ -165,7 +177,7 @@
         function render() {
             fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
             fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
-            mainGroup.rotation.y += 0.005;
+            mainGroup.rotation.y += 0.008; // Xoay nhanh hơn một chút cho giống vũ trụ
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
