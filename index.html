@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Final Fix Heart</title>
+    <title>Magic Hand - Perfect Heart & Snow</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -18,50 +18,39 @@
         #start-btn { padding: 15px 45px; border: 2px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; letter-spacing: 2px; }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
-        #hint { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 1.2rem; pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body>
 
     <div id="bg-image"></div>
-    <div id="hint">Giơ 1 ngón: Gom tâm Trái Tim | Xòe tay: Dải Ngân Hà</div>
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="start-overlay"><button id="start-btn">BẮT ĐẦU</button></div>
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
-        const PARTICLE_COUNT = 20000;
-        let scene, camera, renderer, particles, snowflake, ytPlayer;
+        const PARTICLE_COUNT = 25000;
+        let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
         let handTracker, videoElement, mainGroup;
-        let factorHeart = 0, factorGalaxy = 0;
-        let targetHeart = 0, targetGalaxy = 0;
+        let fHeart = 0, fGalaxy = 0;
+        let tHeart = 0, tGalaxy = 0;
         let photoPairs = []; 
 
-        const driveIDs = [
-            '1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh', '1ikC2YuAgDxVibcxShRcDrZEWGsq8R5Xb',
-            '12ZkIlUC-6m8exE4Xkw_wdYh_ZbjcUa1S', '13zH-VZG0_IULrhFDphyMLc9iPKRX7dCz',
-            '11dlK8KYP-fvt4Il91nwv3Ah7FEg0usl3', '1m5PvE-UdyxEtYftu1T9nQBk8BT6Hpsz5',
-            '1t4P1QXc5fvkGFX2IBce4zBgkseMQRWJY', '11EOid82XxzbPSLRY6LkzT_mwF8G6fq5L'
-        ];
+        const driveIDs = ['1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh', '1ikC2YuAgDxVibcxShRcDrZEWGsq8R5Xb', '12ZkIlUC-6m8exE4Xkw_wdYh_ZbjcUa1S', '13zH-VZG0_IULrhFDphyMLc9iPKRX7dCz', '11dlK8KYP-fvt4Il91nwv3Ah7FEg0usl3', '1m5PvE-UdyxEtYftu1T9nQBk8BT6Hpsz5', '1t4P1QXc5fvkGFX2IBce4zBgkseMQRWJY', '11EOid82XxzbPSLRY6LkzT_mwF8G6fq5L'];
 
         function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('player', {
-                height: '0', width: '0', videoId: '6ag__ntUafU',
-                playerVars: { 'autoplay': 1, 'controls': 0, 'loop': 1, 'playlist': '6ag__ntUafU' },
-                events: { 'onReady': (e) => e.target.mute() }
-            });
+            ytPlayer = new YT.Player('player', { height: '0', width: '0', videoId: '6ag__ntUafU', playerVars: { 'autoplay': 1, 'controls': 0, 'loop': 1, 'playlist': '6ag__ntUafU' }});
         }
 
         document.getElementById('start-btn').onclick = function() {
             document.getElementById('start-overlay').style.display = 'none';
-            if (ytPlayer && ytPlayer.unMute) { ytPlayer.unMute(); ytPlayer.playVideo(); }
+            if (ytPlayer && ytPlayer.playVideo) { ytPlayer.unMute(); ytPlayer.playVideo(); }
             init();
         };
 
         async function init() {
             scene = new THREE.Scene();
             const aspect = window.innerWidth / window.innerHeight;
-            const d = 5.5;
+            const d = 6;
             camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
             camera.position.z = 20;
 
@@ -72,122 +61,128 @@
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
-            createColorfulParticles();
-            createOrganizedImages();
+            createParticles();
+            createPhotos();
+            createSnowflake();
             
             await setupMediaPipe();
             gsap.ticker.add(render);
         }
 
-        function createOrganizedImages() {
+        function createPhotos() {
             const loader = new THREE.TextureLoader();
             loader.setCrossOrigin('anonymous');
 
             driveIDs.forEach((id, i) => {
                 const group = new THREE.Group();
-
-                // Dùng proxy weserv.nl để đảm bảo load được ảnh từ Google Drive
                 const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
-
-                const photoMat = new THREE.MeshBasicMaterial({ 
-                    map: loader.load(proxyUrl, (tex) => {
-                        // Chỉ cho phép hiển thị khi ảnh đã load xong hoàn toàn
-                        pair.isReady = true;
-                    }),
-                    transparent: true, 
-                    opacity: 0,
-                    side: THREE.DoubleSide
-                });
-
-                const borderMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0 });
+                
+                // depthTest: false để ảnh không bị hạt che
+                const photoMat = new THREE.MeshBasicMaterial({ map: loader.load(proxyUrl), transparent: true, opacity: 0, depthTest: false });
+                const borderMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0, depthTest: false });
                 
                 const border = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), borderMat);
                 const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), photoMat);
+                photo.position.z = 0.01; 
                 
-                photo.position.z = 0.2; // Đẩy ảnh lên hẳn phía trước viền
-                group.add(border);
-                group.add(photo);
+                group.add(border); group.add(photo);
 
-                const angle = (i / driveIDs.length) * Math.PI * 2;
+                const angle = (i / 8) * Math.PI * 2;
                 group.userData = {
-                    posGalaxy: new THREE.Vector3(Math.cos(angle)*6, (Math.random()-0.5)*2, Math.sin(angle)*6),
-                    posHeartCenter: new THREE.Vector3(((i % 4) - 1.5) * 1.4, (Math.floor(i / 4) - 0.5) * -1.4, 0),
-                    posCenter: new THREE.Vector3(0,0,0)
+                    posGalaxy: new THREE.Vector3(Math.cos(angle)*5.5, (Math.random()-0.5)*2, Math.sin(angle)*5.5),
+                    posHeart: new THREE.Vector3(((i % 4) - 1.5) * 1.3, (Math.floor(i / 4) - 0.5) * -1.3, 0)
                 };
-
                 mainGroup.add(group);
-                const pair = { group, borderMat, photoMat, isReady: false };
-                photoPairs.push(pair);
+                photoPairs.push({ group, borderMat, photoMat });
             });
         }
 
-        function createColorfulParticles() {
+        function createParticles() {
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3), s = new Float32Array(PARTICLE_COUNT * 3), h = new Float32Array(PARTICLE_COUNT * 3), g = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
+            const pos = new Float32Array(PARTICLE_COUNT * 3), tS = new Float32Array(PARTICLE_COUNT * 3), tH = new Float32Array(PARTICLE_COUNT * 3), tG = new Float32Array(PARTICLE_COUNT * 3);
+            
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                const angT = Math.random()*Math.PI*2, radT = Math.random()*2;
-                s[i*3] = Math.cos(angT)*radT; s[i*3+1] = Math.random()*6-3; s[i*3+2] = Math.sin(angT)*radT;
-                const t = Math.random()*Math.PI*2;
-                const hX = 16*Math.pow(Math.sin(t),3), hY = 13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
-                h[i*3] = hX*0.35; h[i*3+1] = hY*0.35; h[i*3+2] = (Math.random()-0.5)*2;
-                const angG = Math.random()*Math.PI*2, radG = 8+Math.random()*4;
-                g[i*3] = Math.cos(angG)*radG; g[i*3+1] = (Math.random()-0.5)*8; g[i*3+2] = Math.sin(angG)*radG;
-                const c = new THREE.Color(Math.random()>0.8?0xff1493:0xffffff);
-                cols[i*3]=c.r; cols[i*3+1]=c.g; cols[i*3+2]=c.b;
+                // Cấu trúc cây thông cũ
+                const h = Math.random() * 6 - 3;
+                const rT = ((3 - h) / 6) * 2.3;
+                const aT = Math.random() * Math.PI * 2;
+                tS[i*3] = Math.cos(aT)*rT; tS[i*3+1] = h; tS[i*3+2] = Math.sin(aT)*rT;
+
+                // Cấu trúc trái tim
+                const t = Math.random() * Math.PI * 2;
+                const hX = 16 * Math.pow(Math.sin(t), 3), hY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                tH[i*3] = hX * 0.35; tH[i*3+1] = hY * 0.35; tH[i*3+2] = (Math.random()-0.5)*2;
+
+                // Cấu trúc dải ngân hà
+                const aG = Math.random() * Math.PI * 2, rG = 7 + Math.random() * 3;
+                tG[i*3] = Math.cos(aG)*rG; tG[i*3+1] = (Math.random()-0.5)*6; tG[i*3+2] = Math.sin(aG)*rG;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            geo.setAttribute('s', new THREE.BufferAttribute(s, 3));
-            geo.setAttribute('h', new THREE.BufferAttribute(h, 3));
-            geo.setAttribute('g', new THREE.BufferAttribute(g, 3));
-            geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, transparent: true, opacity: 0.7 }));
+            geo.setAttribute('tS', new THREE.BufferAttribute(tS, 3));
+            geo.setAttribute('tH', new THREE.BufferAttribute(tH, 3));
+            geo.setAttribute('tG', new THREE.BufferAttribute(tG, 3));
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.035, color: 0xffffff, transparent: true, opacity: 0.6 }));
             mainGroup.add(particles);
+        }
+
+        function createSnowflake() {
+            snowflakeGroup = new THREE.Group();
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, side: THREE.DoubleSide });
+            for(let i=0; i<6; i++) {
+                const b = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 1), mat);
+                b.rotation.z = (i * Math.PI) / 3;
+                snowflakeGroup.add(b);
+            }
+            snowflakeGroup.position.y = 3.3; 
+            snowflakeGroup.scale.setScalar(0.6);
+            scene.add(snowflakeGroup);
         }
 
         async function setupMediaPipe() {
             videoElement = document.getElementById('webcam');
             handTracker = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
             handTracker.setOptions({ maxNumHands: 1, modelComplexity: 1 });
-            handTracker.onResults(results => {
-                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                    const lm = results.multiHandLandmarks[0];
-                    const isIndexUp = lm[8].y < lm[6].y, isMiddleUp = lm[12].y < lm[10].y;
-                    if (isIndexUp && !isMiddleUp) { targetHeart = 1; targetGalaxy = 0; }
-                    else if (isIndexUp && isMiddleUp) { targetHeart = 0; targetGalaxy = 1; }
-                    else { targetHeart = 0; targetGalaxy = 0; }
-                } else { targetHeart = 0; targetGalaxy = 0; }
+            handTracker.onResults(res => {
+                if (res.multiHandLandmarks && res.multiHandLandmarks[0]) {
+                    const lm = res.multiHandLandmarks[0];
+                    const up1 = lm[8].y < lm[6].y, up2 = lm[12].y < lm[10].y;
+                    if (up1 && !up2) { tHeart = 1; tGalaxy = 0; }
+                    else if (up1 && up2) { tHeart = 0; tGalaxy = 1; }
+                    else { tHeart = 0; tGalaxy = 0; }
+                } else { tHeart = 0; tGalaxy = 0; }
             });
             new Camera(videoElement, { onFrame: async () => await handTracker.send({ image: videoElement }), width: 640, height: 480 }).start();
         }
 
         function render() {
-            factorHeart = THREE.MathUtils.lerp(factorHeart, targetHeart, 0.08);
-            factorGalaxy = THREE.MathUtils.lerp(factorGalaxy, targetGalaxy, 0.08);
+            fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
+            fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
             mainGroup.rotation.y += 0.005;
 
-            const p = particles.geometry.attributes.position, s = particles.geometry.attributes.s, h = particles.geometry.attributes.h, g = particles.geometry.attributes.g;
+            const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
                 let tx = s.array[ix], ty = s.array[iy], tz = s.array[iz];
-                tx = THREE.MathUtils.lerp(tx, h.array[ix], factorHeart); ty = THREE.MathUtils.lerp(ty, h.array[iy], factorHeart); tz = THREE.MathUtils.lerp(tz, h.array[iz], factorHeart);
-                tx = THREE.MathUtils.lerp(tx, g.array[ix], factorGalaxy); ty = THREE.MathUtils.lerp(ty, g.array[iy], factorGalaxy); tz = THREE.MathUtils.lerp(tz, g.array[iz], factorGalaxy);
+                tx = THREE.MathUtils.lerp(tx, h.array[ix], fHeart); ty = THREE.MathUtils.lerp(ty, h.array[iy], fHeart); tz = THREE.MathUtils.lerp(tz, h.array[iz], fHeart);
+                tx = THREE.MathUtils.lerp(tx, g.array[ix], fGalaxy); ty = THREE.MathUtils.lerp(ty, g.array[iy], fGalaxy); tz = THREE.MathUtils.lerp(tz, g.array[iz], fGalaxy);
                 p.array[ix] = tx; p.array[iy] = ty; p.array[iz] = tz;
             }
             p.needsUpdate = true;
 
             photoPairs.forEach(pair => {
-                const targetPos = new THREE.Vector3(0,0,0);
-                targetPos.lerp(pair.group.userData.posHeartCenter, factorHeart);
-                targetPos.lerp(pair.group.userData.posGalaxy, factorGalaxy);
-                pair.group.position.copy(targetPos);
+                const pos = new THREE.Vector3(0,0,0);
+                pos.lerp(pair.group.userData.posHeart, fHeart);
+                pos.lerp(pair.group.userData.posGalaxy, fGalaxy);
+                pair.group.position.copy(pos);
                 pair.group.quaternion.copy(camera.quaternion); 
-                
-                // CHỈ HIỆN VIỀN KHI ẢNH ĐÃ READY
-                const opacity = pair.isReady ? Math.max(factorHeart, factorGalaxy) : 0;
-                pair.photoMat.opacity = opacity;
-                pair.borderMat.opacity = opacity;
-                pair.borderMat.color.setHex(factorHeart > 0.5 ? 0xff1493 : 0xFFD700);
+                pair.photoMat.opacity = Math.max(fHeart, fGalaxy);
+                pair.borderMat.opacity = Math.max(fHeart, fGalaxy);
             });
+
+            if (snowflakeGroup) {
+                snowflakeGroup.visible = (fHeart < 0.1 && fGalaxy < 0.1);
+                snowflakeGroup.rotation.z += 0.01;
+            }
             renderer.render(scene, camera);
         }
     </script>
