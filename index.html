@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Infinite Galaxy Edition</title>
+    <title>Magic Hand - Real Tree with Trunk</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -28,7 +28,7 @@
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
-        const PARTICLE_COUNT = 30000; // Tăng lượng hạt để Galaxy dày hơn
+        const PARTICLE_COUNT = 30000; 
         let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
         let handTracker, videoElement, mainGroup;
         let fHeart = 0, fGalaxy = 0;
@@ -50,7 +50,7 @@
         async function init() {
             scene = new THREE.Scene();
             const aspect = window.innerWidth / window.innerHeight;
-            const d = 6.5; // Tăng tầm nhìn camera để thấy Galaxy rộng hơn
+            const d = 6.5; 
             camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
             camera.position.z = 25;
 
@@ -82,7 +82,6 @@
                 photo.position.z = 0.01; 
                 group.add(border); group.add(photo);
 
-                // Ảnh trong Galaxy cũng bay xa hơn
                 const angle = (i / 8) * Math.PI * 4;
                 const dist = 4.5 + (i * 0.6);
                 group.userData = {
@@ -100,29 +99,46 @@
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111]; 
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // CÂY THÔNG
-                const h = Math.random() * 6 - 3;
-                const rT = ((3 - h) / 6) * 2.3;
-                const aT = Math.random() * Math.PI * 2;
-                tS[i*3] = Math.cos(aT)*rT; tS[i*3+1] = h; tS[i*3+2] = Math.sin(aT)*rT;
+                // MÀU SẮC NGẪU NHIÊN
+                const colorIdx = Math.floor(Math.random() * palette.length);
+                const color = new THREE.Color(palette[colorIdx]);
+                cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
 
-                // TRÁI TIM
+                // 1. CẤU TRÚC CÂY THÔNG CÓ THÂN (TS)
+                if (i < PARTICLE_COUNT * 0.9) {
+                    // Tán lá (90% hạt)
+                    const h = Math.random() * 5.5 - 2.5; // Chiều cao tán lá
+                    const rMax = ((3 - h) / 6) * 2.5; 
+                    const r = Math.sqrt(Math.random()) * rMax; // Phân bổ hạt vào trong lòng nón
+                    const a = Math.random() * Math.PI * 2;
+                    tS[i*3] = Math.cos(a) * r;
+                    tS[i*3+1] = h + 0.5; // Đẩy tán lá lên trên một chút
+                    tS[i*3+2] = Math.sin(a) * r;
+                } else {
+                    // Thân cây (10% hạt)
+                    const hTrunk = Math.random() * 1.5 - 3.5; // Chiều cao thân cây ở dưới đáy
+                    const rTrunk = Math.random() * 0.4; // Độ rộng thân cây
+                    const aTrunk = Math.random() * Math.PI * 2;
+                    tS[i*3] = Math.cos(aTrunk) * rTrunk;
+                    tS[i*3+1] = hTrunk + 0.5;
+                    tS[i*3+2] = Math.sin(aTrunk) * rTrunk;
+                    // Ép thân cây về màu Đen để giống gỗ
+                    cols[i*3] = 0.05; cols[i*3+1] = 0.05; cols[i*3+2] = 0.05;
+                }
+
+                // 2. TRÁI TIM
                 const t = Math.random() * Math.PI * 2;
                 const hX = 16 * Math.pow(Math.sin(t), 3), hY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
                 tH[i*3] = hX * 0.42; tH[i*3+1] = hY * 0.42; tH[i*3+2] = (Math.random()-0.5)*2;
 
-                // GALAXY SIÊU RỘNG VÀ ĐẦY ĐẶN
-                const branch = Math.floor(Math.random() * 4); // 4 nhánh xoáy cho dày
+                // 3. GALAXY RỘNG
+                const branch = Math.floor(Math.random() * 4);
                 const angle = Math.random() * Math.PI * 10;
-                const dist = (Math.random() * 10) + (angle * 0.3); // Tăng bán kính lên 10
-                const noiseY = (Math.random() - 0.5) * 8; // Tăng độ phủ hạt ở phần trên/dưới
-                
+                const dist = (Math.random() * 10) + (angle * 0.3);
+                const noiseY = (Math.random() - 0.5) * 8;
                 tG[i*3] = Math.cos(angle + (branch * Math.PI / 2)) * dist;
-                tG[i*3+1] = noiseY * (1 - (dist/15)); // Hạt ở gần tâm bay cao hơn, xa tâm dẹt lại
+                tG[i*3+1] = noiseY * (1 - (dist/15));
                 tG[i*3+2] = Math.sin(angle + (branch * Math.PI / 2)) * dist;
-
-                const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
-                cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('tS', new THREE.BufferAttribute(tS, 3));
@@ -158,7 +174,8 @@
             const centerGeo = new THREE.RingGeometry(0.08, 0.12, 6);
             const centerRing = new THREE.Mesh(centerGeo, mat);
             centerRing.rotation.z = Math.PI / 2; snowflakeGroup.add(centerRing);
-            snowflakeGroup.position.y = 3.4; snowflakeGroup.scale.setScalar(0.7);
+            snowflakeGroup.position.y = 3.5; // Đặt khớp đỉnh tán lá
+            snowflakeGroup.scale.setScalar(0.7);
             scene.add(snowflakeGroup);
         }
 
