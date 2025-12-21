@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Heart Center Gallery</title>
+    <title>Magic Hand - Final Fix Heart</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -18,13 +18,13 @@
         #start-btn { padding: 15px 45px; border: 2px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; letter-spacing: 2px; }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
-        #hint { position: absolute; top: 20px; width: 100%; text-align: center; color: #ff69b4; font-size: 1.2rem; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px rgba(255,105,180,0.8); }
+        #hint { position: absolute; top: 20px; width: 100%; text-align: center; color: #fff; font-size: 1.2rem; pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body>
 
     <div id="bg-image"></div>
-    <div id="hint">Giơ 1 ngón: Gom ảnh vào giữa Trái Tim | Xòe tay: Dải Ngân Hà</div>
+    <div id="hint">Giơ 1 ngón: Gom tâm Trái Tim | Xòe tay: Dải Ngân Hà</div>
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="start-overlay"><button id="start-btn">BẮT ĐẦU</button></div>
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
@@ -54,7 +54,7 @@
 
         document.getElementById('start-btn').onclick = function() {
             document.getElementById('start-overlay').style.display = 'none';
-            if (ytPlayer) { ytPlayer.unMute(); ytPlayer.setVolume(50); ytPlayer.playVideo(); }
+            if (ytPlayer && ytPlayer.unMute) { ytPlayer.unMute(); ytPlayer.playVideo(); }
             init();
         };
 
@@ -63,7 +63,7 @@
             const aspect = window.innerWidth / window.innerHeight;
             const d = 5.5;
             camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
-            camera.position.z = 10;
+            camera.position.z = 20;
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -74,7 +74,6 @@
 
             createColorfulParticles();
             createOrganizedImages();
-            createRealisticSnowflake();
             
             await setupMediaPipe();
             gsap.ticker.add(render);
@@ -86,79 +85,63 @@
 
             driveIDs.forEach((id, i) => {
                 const group = new THREE.Group();
-                const borderMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0, side: THREE.DoubleSide });
-                const border = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), borderMat);
-                group.add(border);
+
+                // Dùng proxy weserv.nl để đảm bảo load được ảnh từ Google Drive
+                const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
 
                 const photoMat = new THREE.MeshBasicMaterial({ 
-                    map: loader.load(`https://googleusercontent.com/profile/picture/${id}`), 
-                    transparent: true, opacity: 0, side: THREE.DoubleSide
+                    map: loader.load(proxyUrl, (tex) => {
+                        // Chỉ cho phép hiển thị khi ảnh đã load xong hoàn toàn
+                        pair.isReady = true;
+                    }),
+                    transparent: true, 
+                    opacity: 0,
+                    side: THREE.DoubleSide
                 });
+
+                const borderMat = new THREE.MeshBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0 });
+                
+                const border = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), borderMat);
                 const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), photoMat);
-                photo.position.z = 0.1; 
+                
+                photo.position.z = 0.2; // Đẩy ảnh lên hẳn phía trước viền
+                group.add(border);
                 group.add(photo);
 
-                // 1. Vị trí Galaxy (Vòng tròn lớn)
                 const angle = (i / driveIDs.length) * Math.PI * 2;
-                const posGalaxy = new THREE.Vector3(Math.cos(angle)*6, (Math.random()-0.5)*2, Math.sin(angle)*6);
+                group.userData = {
+                    posGalaxy: new THREE.Vector3(Math.cos(angle)*6, (Math.random()-0.5)*2, Math.sin(angle)*6),
+                    posHeartCenter: new THREE.Vector3(((i % 4) - 1.5) * 1.4, (Math.floor(i / 4) - 0.5) * -1.4, 0),
+                    posCenter: new THREE.Vector3(0,0,0)
+                };
 
-                // 2. Vị trí GOM GIỮA (Lưới 4x2 nằm ở trung tâm trái tim)
-                const col = i % 4; 
-                const row = Math.floor(i / 4);
-                const posHeartCenter = new THREE.Vector3((col - 1.5) * 1.4, (row - 0.5) * -1.4, 0);
-
-                group.userData = { posGalaxy, posHeartCenter, posCenter: new THREE.Vector3(0,0,0) };
                 mainGroup.add(group);
-                photoPairs.push({ group, borderMat, photoMat });
+                const pair = { group, borderMat, photoMat, isReady: false };
+                photoPairs.push(pair);
             });
         }
 
         function createColorfulParticles() {
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3);
-            const tarSnow = new Float32Array(PARTICLE_COUNT * 3); // Hình cây thông
-            const tarHeart = new Float32Array(PARTICLE_COUNT * 3); // Hình trái tim bao quanh
-            const tarGalaxy = new Float32Array(PARTICLE_COUNT * 3); // Galaxy bung lụa
-            const cols = new Float32Array(PARTICLE_COUNT * 3);
-
+            const pos = new Float32Array(PARTICLE_COUNT * 3), s = new Float32Array(PARTICLE_COUNT * 3), h = new Float32Array(PARTICLE_COUNT * 3), g = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // Tọa độ cây thông (Snowflake/Tree)
-                const h = Math.random() * 6 - 3; 
-                const radTree = ((3 - h) / 6) * 2.3; 
-                const angTree = Math.random() * Math.PI * 2;
-                tarSnow[i*3] = Math.cos(angTree)*radTree; tarSnow[i*3+1] = h; tarSnow[i*3+2] = Math.sin(angTree)*radTree;
-
-                // Tọa độ hình Trái Tim cho hạt bụi
-                const t = Math.random() * Math.PI * 2;
-                const heartX = 16 * Math.pow(Math.sin(t), 3);
-                const heartY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-                const noise = (Math.random() - 0.5) * 1.5;
-                tarHeart[i*3] = heartX * 0.35 + noise; tarHeart[i*3+1] = heartY * 0.35 + noise; tarHeart[i*3+2] = (Math.random()-0.5)*2;
-
-                // Tọa độ Galaxy
-                const angGal = Math.random() * Math.PI * 2;
-                const radGal = 8 + Math.random() * 4;
-                tarGalaxy[i*3] = Math.cos(angGal)*radGal; tarGalaxy[i*3+1] = (Math.random()-0.5)*8; tarGalaxy[i*3+2] = Math.sin(angGal)*radGal;
-
-                const c = new THREE.Color(Math.random() > 0.8 ? 0xff1493 : 0xffffff);
-                cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
+                const angT = Math.random()*Math.PI*2, radT = Math.random()*2;
+                s[i*3] = Math.cos(angT)*radT; s[i*3+1] = Math.random()*6-3; s[i*3+2] = Math.sin(angT)*radT;
+                const t = Math.random()*Math.PI*2;
+                const hX = 16*Math.pow(Math.sin(t),3), hY = 13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
+                h[i*3] = hX*0.35; h[i*3+1] = hY*0.35; h[i*3+2] = (Math.random()-0.5)*2;
+                const angG = Math.random()*Math.PI*2, radG = 8+Math.random()*4;
+                g[i*3] = Math.cos(angG)*radG; g[i*3+1] = (Math.random()-0.5)*8; g[i*3+2] = Math.sin(angG)*radG;
+                const c = new THREE.Color(Math.random()>0.8?0xff1493:0xffffff);
+                cols[i*3]=c.r; cols[i*3+1]=c.g; cols[i*3+2]=c.b;
             }
-
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            geo.setAttribute('tarSnow', new THREE.BufferAttribute(tarSnow, 3));
-            geo.setAttribute('tarHeart', new THREE.BufferAttribute(tarHeart, 3));
-            geo.setAttribute('tarGalaxy', new THREE.BufferAttribute(tarGalaxy, 3));
+            geo.setAttribute('s', new THREE.BufferAttribute(s, 3));
+            geo.setAttribute('h', new THREE.BufferAttribute(h, 3));
+            geo.setAttribute('g', new THREE.BufferAttribute(g, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-            
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.035, vertexColors: true, transparent: true, opacity: 0.7 }));
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, transparent: true, opacity: 0.7 }));
             mainGroup.add(particles);
-        }
-
-        function createRealisticSnowflake() {
-            snowflake = new THREE.Group();
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 });
-            snowflake.add(new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), mat));
-            scene.add(snowflake);
         }
 
         async function setupMediaPipe() {
@@ -168,16 +151,10 @@
             handTracker.onResults(results => {
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
-                    const isIndexUp = lm[8].y < lm[6].y;
-                    const isMiddleUp = lm[12].y < lm[10].y;
-                    
-                    if (isIndexUp && !isMiddleUp) { // Giơ 1 ngón trỏ
-                        targetHeart = 1; targetGalaxy = 0;
-                    } else if (isIndexUp && isMiddleUp) { // Xòe bàn tay (>= 2 ngón)
-                        targetHeart = 0; targetGalaxy = 1;
-                    } else { // Nắm tay
-                        targetHeart = 0; targetGalaxy = 0;
-                    }
+                    const isIndexUp = lm[8].y < lm[6].y, isMiddleUp = lm[12].y < lm[10].y;
+                    if (isIndexUp && !isMiddleUp) { targetHeart = 1; targetGalaxy = 0; }
+                    else if (isIndexUp && isMiddleUp) { targetHeart = 0; targetGalaxy = 1; }
+                    else { targetHeart = 0; targetGalaxy = 0; }
                 } else { targetHeart = 0; targetGalaxy = 0; }
             });
             new Camera(videoElement, { onFrame: async () => await handTracker.send({ image: videoElement }), width: 640, height: 480 }).start();
@@ -188,46 +165,29 @@
             factorGalaxy = THREE.MathUtils.lerp(factorGalaxy, targetGalaxy, 0.08);
             mainGroup.rotation.y += 0.005;
 
-            // Cập nhật vị trí hạt bụi theo 3 trạng thái
-            const p = particles.geometry.attributes.position;
-            const s = particles.geometry.attributes.tarSnow;
-            const h = particles.geometry.attributes.tarHeart;
-            const g = particles.geometry.attributes.tarGalaxy;
-
+            const p = particles.geometry.attributes.position, s = particles.geometry.attributes.s, h = particles.geometry.attributes.h, g = particles.geometry.attributes.g;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
                 let tx = s.array[ix], ty = s.array[iy], tz = s.array[iz];
-                
-                // Trộn mượt sang Trái tim hoặc Galaxy
-                if (factorHeart > 0) {
-                    tx = THREE.MathUtils.lerp(tx, h.array[ix], factorHeart);
-                    ty = THREE.MathUtils.lerp(ty, h.array[iy], factorHeart);
-                    tz = THREE.MathUtils.lerp(tz, h.array[iz], factorHeart);
-                }
-                if (factorGalaxy > 0) {
-                    tx = THREE.MathUtils.lerp(tx, g.array[ix], factorGalaxy);
-                    ty = THREE.MathUtils.lerp(ty, g.array[iy], factorGalaxy);
-                    tz = THREE.MathUtils.lerp(tz, g.array[iz], factorGalaxy);
-                }
+                tx = THREE.MathUtils.lerp(tx, h.array[ix], factorHeart); ty = THREE.MathUtils.lerp(ty, h.array[iy], factorHeart); tz = THREE.MathUtils.lerp(tz, h.array[iz], factorHeart);
+                tx = THREE.MathUtils.lerp(tx, g.array[ix], factorGalaxy); ty = THREE.MathUtils.lerp(ty, g.array[iy], factorGalaxy); tz = THREE.MathUtils.lerp(tz, g.array[iz], factorGalaxy);
                 p.array[ix] = tx; p.array[iy] = ty; p.array[iz] = tz;
             }
             p.needsUpdate = true;
 
-            // Cập nhật vị trí 8 tấm ảnh
             photoPairs.forEach(pair => {
-                const currentPos = new THREE.Vector3(0,0,0);
-                if (factorHeart > 0) currentPos.lerp(pair.group.userData.posHeartCenter, factorHeart);
-                if (factorGalaxy > 0) currentPos.lerp(pair.group.userData.posGalaxy, factorGalaxy);
-                
-                pair.group.position.copy(currentPos);
+                const targetPos = new THREE.Vector3(0,0,0);
+                targetPos.lerp(pair.group.userData.posHeartCenter, factorHeart);
+                targetPos.lerp(pair.group.userData.posGalaxy, factorGalaxy);
+                pair.group.position.copy(targetPos);
                 pair.group.quaternion.copy(camera.quaternion); 
-                pair.photoMat.opacity = Math.max(factorHeart, factorGalaxy);
-                pair.borderMat.opacity = Math.max(factorHeart, factorGalaxy);
                 
-                // Nếu ở chế độ Trái tim, đổi viền sang hồng cho đẹp
+                // CHỈ HIỆN VIỀN KHI ẢNH ĐÃ READY
+                const opacity = pair.isReady ? Math.max(factorHeart, factorGalaxy) : 0;
+                pair.photoMat.opacity = opacity;
+                pair.borderMat.opacity = opacity;
                 pair.borderMat.color.setHex(factorHeart > 0.5 ? 0xff1493 : 0xFFD700);
             });
-
             renderer.render(scene, camera);
         }
     </script>
