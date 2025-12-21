@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Golden Glow Edition</title>
+    <title>Magic Hand - Photo with Gold Border Fix</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -33,7 +33,7 @@
         let scene, camera, renderer, particles, snowflake, ytPlayer;
         let handTracker, videoElement, mainGroup;
         let assemblyFactor = 0, targetAssembly = 0;
-        let photoItems = []; // Chứa cả ảnh và viền
+        let photoPairs = []; 
 
         const driveIDs = [
             '1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh', '1ikC2YuAgDxVibcxShRcDrZEWGsq8R5Xb',
@@ -80,46 +80,47 @@
             const loader = new THREE.TextureLoader();
             loader.setCrossOrigin('anonymous');
             
+            // Tạo một texture màu vàng trơn cho viền
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffd700'; // Màu vàng Gold
+            ctx.fillRect(0, 0, 64, 64);
+            const borderTexture = new THREE.CanvasTexture(canvas);
+
             driveIDs.forEach((id, i) => {
-                const container = new THREE.Group(); // Nhóm ảnh và viền lại với nhau
-                
-                // 1. TẠO VIỀN VÀNG PHÁT SÁNG
-                const borderGeo = new THREE.PlaneGeometry(1.65, 1.65); // Lớn hơn ảnh một chút
-                const borderMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffd700, 
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 0
-                });
-                const border = new THREE.Mesh(borderGeo, borderMat);
-                
-                // 2. TẠO ẢNH CHÍNH
-                const url = `http://googleusercontent.com/profile/picture/8{id}`;
-                const texture = loader.load(url);
-                const photoMat = new THREE.MeshBasicMaterial({ 
-                    map: texture, 
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 0
-                });
-                const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), photoMat);
-                photo.position.z = 0.01; // Đẩy ảnh lên trước viền một tí để không bị lỗi hiển thị
+                // 1. TẠO VIỀN (Sprite phía sau)
+                const borderMat = new THREE.SpriteMaterial({ map: borderTexture, transparent: true, opacity: 0 });
+                const borderSprite = new THREE.Sprite(borderMat);
+                borderSprite.scale.set(1.7, 1.7, 1); // Viền to hơn ảnh
+                borderSprite.renderOrder = 1; // Vẽ trước
 
-                container.add(border);
-                container.add(photo);
+                // 2. TẠO ẢNH (Sprite phía trước)
+                const url = `http://googleusercontent.com/profile/picture/9{id}`;
+                const photoTexture = loader.load(url);
+                const photoMat = new THREE.SpriteMaterial({ map: photoTexture, transparent: true, opacity: 0 });
+                const photoSprite = new THREE.Sprite(photoMat);
+                photoSprite.scale.set(1.5, 1.5, 1);
+                photoSprite.renderOrder = 2; // Vẽ sau (đè lên viền)
 
-                // Thiết lập vị trí bung ra
+                // Tính toán vị trí bung ra
                 const angle = (i / driveIDs.length) * Math.PI * 2;
                 const radius = 5.5;
-                container.userData.chaosPos = new THREE.Vector3(
+                const chaosPos = new THREE.Vector3(
                     Math.cos(angle) * radius,
                     (Math.random() - 0.5) * 2,
                     Math.sin(angle) * radius
                 );
-                container.userData.treePos = new THREE.Vector3(0, 0, 0);
-                
-                mainGroup.add(container);
-                photoItems.push({ container, borderMat, photoMat });
+
+                mainGroup.add(borderSprite);
+                mainGroup.add(photoSprite);
+
+                photoPairs.push({ 
+                    photo: photoSprite, 
+                    border: borderSprite, 
+                    chaos: chaosPos, 
+                    tree: new THREE.Vector3(0,0,0) 
+                });
             });
         }
 
@@ -146,13 +147,13 @@
             geo.setAttribute('chaos', new THREE.BufferAttribute(chos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff'; ctx.fill();
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = 64; pCanvas.height = 64;
+            const pCtx = pCanvas.getContext('2d');
+            pCtx.beginPath(); pCtx.arc(32, 32, 30, 0, Math.PI * 2);
+            pCtx.fillStyle = '#ffffff'; pCtx.fill();
 
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, map: new THREE.CanvasTexture(canvas), transparent: true, opacity: 0.8 }));
+            particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, map: new THREE.CanvasTexture(pCanvas), transparent: true, opacity: 0.8 }));
             mainGroup.add(particles);
         }
 
@@ -204,15 +205,15 @@
 
             mainGroup.rotation.y += 0.005;
 
-            photoItems.forEach(item => {
-                item.container.position.lerpVectors(item.container.userData.chaosPos, item.container.userData.treePos, assemblyFactor);
-                // Ảnh và viền hiện rõ khi xòe tay (1 - assemblyFactor)
-                const opacity = 1 - assemblyFactor;
-                item.borderMat.opacity = opacity;
-                item.photoMat.opacity = opacity;
+            photoPairs.forEach(pair => {
+                // Di chuyển cả ảnh và viền theo cùng vị trí
+                pair.photo.position.lerpVectors(pair.chaos, pair.tree, assemblyFactor);
+                pair.border.position.copy(pair.photo.position);
                 
-                // Giúp ảnh luôn hướng về phía Camera để không bị dẹt khi xoay
-                item.container.lookAt(camera.position);
+                // Hiển thị mượt mà
+                const opacity = 1 - assemblyFactor;
+                pair.photo.material.opacity = opacity;
+                pair.border.material.opacity = opacity;
             });
 
             if(snowflake) {
