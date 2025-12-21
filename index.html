@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - No Backface Issue</title>
+    <title>Magic Hand - Perfect Billboard Photos</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -88,19 +88,17 @@
                 const group = new THREE.Group();
                 const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
                 
-                // QUAN TRỌNG: Thêm side: THREE.DoubleSide để không mất hình khi xoay mặt sau
+                // Sử dụng material chuẩn, tắt depthWrite để tránh lỗi vỡ hạt xung quanh ảnh
                 const photoMat = new THREE.MeshBasicMaterial({ 
                     map: loader.load(proxyUrl), 
                     transparent: true, 
                     opacity: 0, 
-                    side: THREE.DoubleSide,
                     depthWrite: false 
                 });
                 const borderMat = new THREE.MeshBasicMaterial({ 
                     color: 0xFFD700, 
                     transparent: true, 
                     opacity: 0, 
-                    side: THREE.DoubleSide,
                     depthWrite: false
                 });
 
@@ -162,7 +160,6 @@
             geo.setAttribute('tG', new THREE.BufferAttribute(tG, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             
-            // Particles vốn dĩ hiển thị đa chiều tốt hơn, nhưng giữ opacity cao để rực rỡ
             particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.18, vertexColors: true, transparent: true, opacity: 0.85 }));
             mainGroup.add(particles);
         }
@@ -215,7 +212,10 @@
         function render() {
             fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
             fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
+            
+            // Xoay toàn bộ Group
             mainGroup.rotation.y += 0.008; 
+
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
@@ -225,16 +225,22 @@
                 p.array[ix] = tx; p.array[iy] = ty; p.array[iz] = tz;
             }
             p.needsUpdate = true;
+
             photoPairs.forEach(pair => {
+                // Tính toán vị trí hạt bay
                 const pos = new THREE.Vector3(0,0,0);
                 pos.lerp(pair.group.userData.posHeart, fHeart);
                 pos.lerp(pair.group.userData.posGalaxy, fGalaxy);
                 pair.group.position.copy(pos);
-                
-                // Khi xoay Galaxy, ảnh sẽ xoay theo Group, DoubleSide sẽ giúp nhìn thấy mặt sau
+
+                // KỸ THUẬT BILLBOARD: Đảm bảo ảnh luôn hướng về camera
+                // Chúng ta lấy góc xoay ngược lại với mainGroup để ảnh không bị xoay theo
+                pair.group.rotation.y = -mainGroup.rotation.y;
+
                 pair.photoMat.opacity = Math.max(fHeart, fGalaxy);
                 pair.borderMat.opacity = Math.max(fHeart, fGalaxy);
             });
+
             if (snowflakeGroup) {
                 snowflakeGroup.visible = (fHeart < 0.1 && fGalaxy < 0.1);
                 snowflakeGroup.rotation.z += 0.02;
