@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Christmas Fix</title>
+    <title>Magic Hand - 8 Personal Photos</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -15,7 +15,8 @@
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #bg-image { position: fixed; inset: 0; background: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070') center/cover; filter: brightness(0.1); z-index: -1; }
         #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 200; }
-        #start-btn { padding: 15px 45px; border: 2px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; letter-spacing: 2px; }
+        #start-btn { padding: 15px 45px; border: 2px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; letter-spacing: 2px; transition: 0.3s; }
+        #start-btn:hover { background: #fff; color: #000; }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
         #yt-player-container { position: absolute; top: -1000px; left: -1000px; }
@@ -25,7 +26,7 @@
 
     <div id="bg-image"></div>
     <div id="yt-player-container"><div id="player"></div></div>
-    <div id="start-overlay"><button id="start-btn">NHẤN ĐỂ BẮT ĐẦU</button></div>
+    <div id="start-overlay"><button id="start-btn">BẮT ĐẦU TRẢI NGHIỆM</button></div>
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
@@ -35,33 +36,29 @@
         let assemblyFactor = 0, targetAssembly = 0;
         let extraImages = [];
 
-        // LINK ẢNH ĐÃ FIX ĐỊNH DẠNG CHO DRIVE
-        const photoID = '1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh';
-        const directPhotoLink = `https://lh3.googleusercontent.com/d/${photoID}`;
+        // DANH SÁCH 8 ID ẢNH CỦA BẠN
+        const driveIDs = [
+            '1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh',
+            '1ikC2YuAgDxVibcxShRcDrZEWGsq8R5Xb',
+            '12ZkIlUC-6m8exE4Xkw_wdYh_ZbjcUa1S',
+            '13zH-VZG0_IULrhFDphyMLc9iPKRX7dCz',
+            '11dlK8KYP-fvt4Il91nwv3Ah7FEg0usl3',
+            '1m5PvE-UdyxEtYftu1T9nQBk8BT6Hpsz5',
+            '1t4P1QXc5fvkGFX2IBce4zBgkseMQRWJY',
+            '11EOid82XxzbPSLRY6LkzT_mwF8G6fq5L'
+        ];
 
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('player', {
                 height: '0', width: '0', videoId: '6ag__ntUafU',
-                playerVars: { 
-                    'autoplay': 1, 
-                    'controls': 0, 
-                    'loop': 1, 
-                    'playlist': '6ag__ntUafU',
-                    'origin': window.location.origin 
-                },
-                events: {
-                    'onReady': (event) => { event.target.mute(); } // Mute trước để lách luật tự động phát
-                }
+                playerVars: { 'autoplay': 1, 'controls': 0, 'loop': 1, 'playlist': '6ag__ntUafU' },
+                events: { 'onReady': (e) => e.target.mute() }
             });
         }
 
         document.getElementById('start-btn').onclick = function() {
             document.getElementById('start-overlay').style.display = 'none';
-            if (ytPlayer) {
-                ytPlayer.unMute();
-                ytPlayer.setVolume(50);
-                ytPlayer.playVideo();
-            }
+            if (ytPlayer) { ytPlayer.unMute(); ytPlayer.setVolume(50); ytPlayer.playVideo(); }
             init();
         };
 
@@ -84,33 +81,33 @@
 
         function createOrganizedImages() {
             const loader = new THREE.TextureLoader();
-            loader.setCrossOrigin('anonymous'); 
+            loader.setCrossOrigin('anonymous');
             
-            const numPhotos = 8; 
-            for (let i = 0; i < numPhotos; i++) {
-                const texture = loader.load(directPhotoLink);
+            driveIDs.forEach((id, i) => {
+                const url = `https://lh3.googleusercontent.com/u/0/d/${id}`;
+                const texture = loader.load(url);
                 const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0 });
                 const sprite = new THREE.Sprite(material);
                 
-                const angle = (i / numPhotos) * Math.PI * 2;
-                const radius = 5.5; 
+                const angle = (i / driveIDs.length) * Math.PI * 2;
+                const radius = 5.5;
                 
                 sprite.userData.chaosPos = new THREE.Vector3(
                     Math.cos(angle) * radius,
-                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 1.5,
                     Math.sin(angle) * radius
                 );
                 sprite.userData.treePos = new THREE.Vector3(0, 0, 0);
-                sprite.scale.set(1.5, 1.5, 1); 
+                sprite.scale.set(1.5, 1.5, 1);
                 scene.add(sprite);
                 extraImages.push(sprite);
-            }
+            });
         }
 
         function createColorfulParticles() {
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(PARTICLE_COUNT * 3), tar = new Float32Array(PARTICLE_COUNT * 3), chos = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
-            const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x222222];
+            const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x333333];
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const h = Math.random() * 6 - 3; 
@@ -186,11 +183,11 @@
             p.needsUpdate = true;
             particles.rotation.y += 0.003;
 
-            extraImages.forEach((sprite, idx) => {
+            extraImages.forEach(sprite => {
                 sprite.position.lerpVectors(sprite.userData.chaosPos, sprite.userData.treePos, assemblyFactor);
-                sprite.material.opacity = THREE.MathUtils.lerp(1, 0, assemblyFactor);
-                // Xoay ảnh theo vòng tròn bụi hạt
-                sprite.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.003);
+                sprite.material.opacity = 1 - assemblyFactor;
+                // Xoay vòng tròn ảnh quanh tâm
+                sprite.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.005);
             });
 
             if(snowflake) {
