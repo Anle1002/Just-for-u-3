@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Core Hand Gestures - Xmas Tree with Music</title>
+    <title>Magic Hand - Final Edition</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -12,13 +12,13 @@
     <script src="https://www.youtube.com/iframe_api"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #bg-image { position: fixed; inset: 0; background: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070') center/cover; filter: brightness(0.1); z-index: -1; }
         #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 200; }
-        #start-btn { padding: 15px 40px; border: 1px solid #fff; background: none; color: #fff; cursor: pointer; font-family: sans-serif; letter-spacing: 2px; }
+        #start-btn { padding: 15px 45px; border: 1px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.1rem; letter-spacing: 2px; transition: 0.3s; }
+        #start-btn:hover { background: #fff; color: #000; }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
-        /* Ẩn trình phát nhạc */
         #yt-player-container { position: absolute; top: -1000px; left: -1000px; }
     </style>
 </head>
@@ -36,7 +36,7 @@
         let handTracker, videoElement;
         let assemblyFactor = 0, targetAssembly = 0;
 
-        // Khởi tạo trình phát nhạc
+        // Tích hợp bài nhạc bạn yêu cầu
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('player', {
                 height: '0', width: '0', videoId: '6ag__ntUafU',
@@ -46,7 +46,6 @@
 
         document.getElementById('start-btn').onclick = function() {
             document.getElementById('start-overlay').style.display = 'none';
-            // Phát nhạc khi nhấn bắt đầu
             if (ytPlayer && ytPlayer.playVideo) ytPlayer.playVideo();
             init();
         };
@@ -69,16 +68,23 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
             
-            createParticles();
-            createSnowflake();
+            createColorfulParticles();
+            createRealisticSnowflake();
             await setupMediaPipe();
             gsap.ticker.add(render);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
         }
 
-        function createParticles() {
+        function createColorfulParticles() {
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(PARTICLE_COUNT * 3), tar = new Float32Array(PARTICLE_COUNT * 3);
             const chos = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
+            
+            // Bảng màu 5 màu: Vàng, Xanh lá, Trắng, Đỏ, Đen
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111];
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -106,7 +112,7 @@
             scene.add(particles);
         }
 
-        function createSnowflake() {
+        function createRealisticSnowflake() {
             snowflake = new THREE.Group();
             const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0 });
             const createBranch = () => {
@@ -130,7 +136,8 @@
             handTracker.onResults(results => {
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
-                    targetAssembly = (lm[8].y > lm[6].y && lm[12].y > lm[10].y) ? 1 : 0;
+                    // Logic Nắm tay sắc nét
+                    targetAssembly = (lm[8].y > lm[6].y && lm[12].y > lm[10].y && lm[16].y > lm[14].y) ? 1 : 0;
                 } else { targetAssembly = 0; }
             });
             new Camera(videoElement, { onFrame: async () => await handTracker.send({ image: videoElement }), width: 640, height: 480 }).start();
@@ -139,14 +146,27 @@
         function render() {
             assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.07);
             
-            // Điều chỉnh âm lượng theo trạng thái cây (Nắm tay = 80%, Xòe tay = 20%)
-            if(ytPlayer && ytPlayer.setVolume) {
-                ytPlayer.setVolume(20 + assemblyFactor * 60);
-            }
+            // Nhạc to khi nắm tay, nhỏ khi xòe tay
+            if(ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(25 + assemblyFactor * 65);
 
             const p = particles.geometry.attributes.position, t = particles.geometry.attributes.target, c = particles.geometry.attributes.chaos;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
                 p.array[ix] = THREE.MathUtils.lerp(c.array[ix], t.array[ix], assemblyFactor);
                 p.array[iy] = THREE.MathUtils.lerp(c.array[iy], t.array[iy], assemblyFactor);
-                p.array[iz] = THREE.MathUtils.
+                p.array[iz] = THREE.MathUtils.lerp(c.array[iz], t.array[iz], assemblyFactor);
+            }
+            p.needsUpdate = true;
+            particles.rotation.y += 0.003;
+
+            if(snowflake) {
+                snowflake.scale.setScalar(assemblyFactor * 1.4);
+                snowflake.rotation.y += 0.03;
+                snowflake.rotation.z += 0.01;
+                snowflake.traverse(child => { if(child.material) child.material.opacity = assemblyFactor; });
+            }
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
