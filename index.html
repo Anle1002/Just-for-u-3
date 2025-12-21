@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Real Tree with Trunk</title>
+    <title>Magic Hand - Christmas Gift Edition</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -15,7 +15,23 @@
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #bg-image { position: fixed; inset: 0; background: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070') center/cover; filter: brightness(0.1); z-index: -1; }
         #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 200; }
-        #start-btn { padding: 15px 45px; border: 2px solid #fff; background: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; letter-spacing: 2px; }
+        /* CSS cho nút bấm mới */
+        #start-btn { 
+            padding: 20px 40px; 
+            border: 3px solid #ff4d4d; 
+            background: rgba(255, 255, 255, 0.1); 
+            color: #fff; 
+            cursor: pointer; 
+            font-size: 1.5rem; 
+            font-weight: bold; 
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 77, 77, 0.5);
+        }
+        #start-btn:hover {
+            background: #ff4d4d;
+            transform: scale(1.1);
+        }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
     </style>
@@ -24,7 +40,7 @@
 
     <div id="bg-image"></div>
     <div id="yt-player-container"><div id="player"></div></div>
-    <div id="start-overlay"><button id="start-btn">BẮT ĐẦU</button></div>
+    <div id="start-overlay"><button id="start-btn">Quà giáng sinh của bé nè ^^</button></div>
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
@@ -99,39 +115,32 @@
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111]; 
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // MÀU SẮC NGẪU NHIÊN
                 const colorIdx = Math.floor(Math.random() * palette.length);
                 const color = new THREE.Color(palette[colorIdx]);
                 cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
 
-                // 1. CẤU TRÚC CÂY THÔNG CÓ THÂN (TS)
                 if (i < PARTICLE_COUNT * 0.9) {
-                    // Tán lá (90% hạt)
-                    const h = Math.random() * 5.5 - 2.5; // Chiều cao tán lá
+                    const h = Math.random() * 5.5 - 2.5;
                     const rMax = ((3 - h) / 6) * 2.5; 
-                    const r = Math.sqrt(Math.random()) * rMax; // Phân bổ hạt vào trong lòng nón
+                    const r = Math.sqrt(Math.random()) * rMax;
                     const a = Math.random() * Math.PI * 2;
                     tS[i*3] = Math.cos(a) * r;
-                    tS[i*3+1] = h + 0.5; // Đẩy tán lá lên trên một chút
+                    tS[i*3+1] = h + 0.5;
                     tS[i*3+2] = Math.sin(a) * r;
                 } else {
-                    // Thân cây (10% hạt)
-                    const hTrunk = Math.random() * 1.5 - 3.5; // Chiều cao thân cây ở dưới đáy
-                    const rTrunk = Math.random() * 0.4; // Độ rộng thân cây
+                    const hTrunk = Math.random() * 1.5 - 3.5;
+                    const rTrunk = Math.random() * 0.4;
                     const aTrunk = Math.random() * Math.PI * 2;
                     tS[i*3] = Math.cos(aTrunk) * rTrunk;
                     tS[i*3+1] = hTrunk + 0.5;
                     tS[i*3+2] = Math.sin(aTrunk) * rTrunk;
-                    // Ép thân cây về màu Đen để giống gỗ
                     cols[i*3] = 0.05; cols[i*3+1] = 0.05; cols[i*3+2] = 0.05;
                 }
 
-                // 2. TRÁI TIM
                 const t = Math.random() * Math.PI * 2;
                 const hX = 16 * Math.pow(Math.sin(t), 3), hY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
                 tH[i*3] = hX * 0.42; tH[i*3+1] = hY * 0.42; tH[i*3+2] = (Math.random()-0.5)*2;
 
-                // 3. GALAXY RỘNG
                 const branch = Math.floor(Math.random() * 4);
                 const angle = Math.random() * Math.PI * 10;
                 const dist = (Math.random() * 10) + (angle * 0.3);
@@ -174,7 +183,7 @@
             const centerGeo = new THREE.RingGeometry(0.08, 0.12, 6);
             const centerRing = new THREE.Mesh(centerGeo, mat);
             centerRing.rotation.z = Math.PI / 2; snowflakeGroup.add(centerRing);
-            snowflakeGroup.position.y = 3.5; // Đặt khớp đỉnh tán lá
+            snowflakeGroup.position.y = 3.5;
             snowflakeGroup.scale.setScalar(0.7);
             scene.add(snowflakeGroup);
         }
