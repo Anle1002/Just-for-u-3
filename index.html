@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Hand - Final Edition</title>
+    <title>Magic Hand - Photo from Drive</title>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -35,8 +35,13 @@
         let scene, camera, renderer, particles, snowflake, ytPlayer;
         let handTracker, videoElement;
         let assemblyFactor = 0, targetAssembly = 0;
+        let extraImages = [];
 
-        // Tích hợp bài nhạc bạn yêu cầu
+        // ĐÃ CẬP NHẬT LINK DRIVE TỪ ID CỦA BẠN
+        const imageSources = [
+            'https://lh3.googleusercontent.com/u/0/d/1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh'
+        ];
+
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('player', {
                 height: '0', width: '0', videoId: '6ag__ntUafU',
@@ -50,15 +55,6 @@
             init();
         };
 
-        function createCircleTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff'; ctx.fill();
-            return new THREE.CanvasTexture(canvas);
-        }
-
         async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -70,21 +66,40 @@
             
             createColorfulParticles();
             createRealisticSnowflake();
+            createCustomImages();
+            
             await setupMediaPipe();
             gsap.ticker.add(render);
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+        }
+
+        function createCustomImages() {
+            const loader = new THREE.TextureLoader();
+            loader.setCrossOrigin('anonymous'); // Quan trọng để load ảnh từ Drive
+            
+            for (let i = 0; i < 15; i++) {
+                const texture = loader.load(imageSources[0]);
+                const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0 });
+                const sprite = new THREE.Sprite(material);
+                
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 3.5 + Math.random() * 4;
+                sprite.userData.chaosPos = new THREE.Vector3(
+                    Math.cos(angle) * radius,
+                    (Math.random() - 0.5) * 8,
+                    Math.sin(angle) * radius
+                );
+                sprite.userData.treePos = new THREE.Vector3(0, (Math.random() * 4) - 2, 0);
+
+                sprite.scale.set(0.8, 0.8, 1); 
+                scene.add(sprite);
+                extraImages.push(sprite);
+            }
         }
 
         function createColorfulParticles() {
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(PARTICLE_COUNT * 3), tar = new Float32Array(PARTICLE_COUNT * 3);
             const chos = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
-            
-            // Bảng màu 5 màu: Vàng, Xanh lá, Trắng, Đỏ, Đen
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111];
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -100,14 +115,19 @@
                 const c = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
                 cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
             }
-
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('target', new THREE.BufferAttribute(tar, 3));
             geo.setAttribute('chaos', new THREE.BufferAttribute(chos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
             
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff'; ctx.fill();
+
             particles = new THREE.Points(geo, new THREE.PointsMaterial({ 
-                size: 0.04, vertexColors: true, map: createCircleTexture(), transparent: true, opacity: 1, alphaTest: 0.05
+                size: 0.04, vertexColors: true, map: new THREE.CanvasTexture(canvas), transparent: true, opacity: 1, alphaTest: 0.05
             }));
             scene.add(particles);
         }
@@ -136,7 +156,6 @@
             handTracker.onResults(results => {
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
-                    // Logic Nắm tay sắc nét
                     targetAssembly = (lm[8].y > lm[6].y && lm[12].y > lm[10].y && lm[16].y > lm[14].y) ? 1 : 0;
                 } else { targetAssembly = 0; }
             });
@@ -145,8 +164,6 @@
 
         function render() {
             assemblyFactor = THREE.MathUtils.lerp(assemblyFactor, targetAssembly, 0.07);
-            
-            // Nhạc to khi nắm tay, nhỏ khi xòe tay
             if(ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(25 + assemblyFactor * 65);
 
             const p = particles.geometry.attributes.position, t = particles.geometry.attributes.target, c = particles.geometry.attributes.chaos;
@@ -159,10 +176,15 @@
             p.needsUpdate = true;
             particles.rotation.y += 0.003;
 
+            extraImages.forEach(sprite => {
+                sprite.position.lerpVectors(sprite.userData.chaosPos, sprite.userData.treePos, assemblyFactor);
+                sprite.rotation.z += 0.02;
+                sprite.material.opacity = 1 - assemblyFactor;
+            });
+
             if(snowflake) {
                 snowflake.scale.setScalar(assemblyFactor * 1.4);
                 snowflake.rotation.y += 0.03;
-                snowflake.rotation.z += 0.01;
                 snowflake.traverse(child => { if(child.material) child.material.opacity = assemblyFactor; });
             }
             renderer.render(scene, camera);
