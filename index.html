@@ -43,6 +43,21 @@
         const PARTICLE_COUNT = 35000; 
         let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
         let snowflakeSparkles = [], snowflakeGlow;
+        let starMaterial; // dùng để nhấp nháy lấp lánh nhẹ
+
+        // === ĐÈN NOEL (lá cây) ===
+        let lightParticles, lightMaterial;
+        let lightIndices = [];
+
+        // === LÁ CÂY: SPARKLE LAYER (B) ===
+        let leafSparkles, leafSparkleMat;
+        let leafSparkleIndices = [];
+        let leafSparkleBaseCols, leafSparkleCols, leafSparklePhase, leafSparkleSpeed;
+
+        // === THÂN CÂY: glow thường + lõi core glow (điểm nhấn) ===
+        let trunkParticles, trunkMaterial, trunkIndices = [];
+        let trunkCoreParticles, trunkCoreMaterial, trunkCoreIndices = [];
+
         let handTracker, videoElement, mainGroup;
         let fHeart = 0, fGalaxy = 0;
         let tHeart = 0, tGalaxy = 0;
@@ -62,6 +77,14 @@
 
         async function init() {
             scene = new THREE.Scene();
+
+            // Đèn để sao 3D nổi khối thật hơn
+            const amb = new THREE.AmbientLight(0xffffff, 0.62);
+            scene.add(amb);
+            const dir = new THREE.DirectionalLight(0xffffff, 1.05);
+            dir.position.set(7, 10, 10);
+            scene.add(dir);
+
             const aspect = window.innerWidth / window.innerHeight;
             const d = 8; 
             camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
@@ -89,7 +112,6 @@
                 const group = new THREE.Group();
                 const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
                 
-                // Sử dụng material chuẩn, tắt depthWrite để tránh lỗi vỡ hạt xung quanh ảnh
                 const photoMat = new THREE.MeshBasicMaterial({ 
                     map: loader.load(proxyUrl), 
                     transparent: true, 
@@ -119,9 +141,212 @@
             });
         }
 
+        // === ĐÈN NOEL (lá) ===
+        function createLights() {
+            if (!lightIndices.length) return;
+
+            const baseGeo = particles.geometry;
+            const s = baseGeo.attributes.tS;
+
+            const lGeo = new THREE.BufferGeometry();
+            const lPos = new Float32Array(lightIndices.length * 3);
+            const lCols = new Float32Array(lightIndices.length * 3);
+
+            const lightPalette = [0xffffff, 0xffd700, 0xff3b30, 0x34c759, 0x5ac8fa];
+
+            for (let j = 0; j < lightIndices.length; j++) {
+                const i = lightIndices[j];
+                const ix = i * 3;
+
+                lPos[j*3]   = s.array[ix];
+                lPos[j*3+1] = s.array[ix+1];
+                lPos[j*3+2] = s.array[ix+2];
+
+                const c = new THREE.Color(lightPalette[Math.floor(Math.random() * lightPalette.length)]);
+                lCols[j*3]   = c.r;
+                lCols[j*3+1] = c.g;
+                lCols[j*3+2] = c.b;
+            }
+
+            lGeo.setAttribute('position', new THREE.BufferAttribute(lPos, 3));
+            lGeo.setAttribute('color', new THREE.BufferAttribute(lCols, 3));
+
+            lightMaterial = new THREE.PointsMaterial({
+                size: 0.42,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            lightParticles = new THREE.Points(lGeo, lightMaterial);
+            lightParticles.renderOrder = 8;
+            mainGroup.add(lightParticles);
+        }
+
+        // === LÁ CÂY SPARKLES (B) ===
+        function createLeafSparkles() {
+            if (!leafSparkleIndices.length) return;
+
+            const baseGeo = particles.geometry;
+            const s = baseGeo.attributes.tS;
+
+            const spGeo = new THREE.BufferGeometry();
+            const spPos = new Float32Array(leafSparkleIndices.length * 3);
+            const spCols = new Float32Array(leafSparkleIndices.length * 3);
+            const baseCols = new Float32Array(leafSparkleIndices.length * 3);
+            const phase = new Float32Array(leafSparkleIndices.length);
+            const speed = new Float32Array(leafSparkleIndices.length);
+
+            // màu sparkle kiểu “tuyết lấp lánh” (lạnh, trắng, hơi xanh)
+            const sparklePalette = [0xffffff, 0xf2f7ff, 0xe6f2ff, 0xdff6ff];
+
+            for (let j = 0; j < leafSparkleIndices.length; j++) {
+                const i = leafSparkleIndices[j];
+                const ix = i * 3;
+
+                spPos[j*3]   = s.array[ix];
+                spPos[j*3+1] = s.array[ix+1];
+                spPos[j*3+2] = s.array[ix+2];
+
+                const c = new THREE.Color(sparklePalette[Math.floor(Math.random() * sparklePalette.length)]);
+                baseCols[j*3]   = c.r;
+                baseCols[j*3+1] = c.g;
+                baseCols[j*3+2] = c.b;
+
+                spCols[j*3]   = baseCols[j*3];
+                spCols[j*3+1] = baseCols[j*3+1];
+                spCols[j*3+2] = baseCols[j*3+2];
+
+                phase[j] = Math.random() * Math.PI * 2;
+                speed[j] = 3.5 + Math.random() * 6.5;
+            }
+
+            spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
+            spGeo.setAttribute('color', new THREE.BufferAttribute(spCols, 3));
+
+            leafSparkleBaseCols = baseCols;
+            leafSparkleCols = spGeo.attributes.color;
+            leafSparklePhase = phase;
+            leafSparkleSpeed = speed;
+
+            leafSparkleMat = new THREE.PointsMaterial({
+                size: 0.56,                 // sparkle to hơn hạt lá bình thường
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.0,
+                depthWrite: false,
+                depthTest: false,           // để không bị “chìm” vào lá
+                blending: THREE.AdditiveBlending
+            });
+
+            leafSparkles = new THREE.Points(spGeo, leafSparkleMat);
+            leafSparkles.renderOrder = 9;
+            mainGroup.add(leafSparkles);
+        }
+
+        // === THÂN CÂY glow thường (ấm hơn, thấy rõ hơn) ===
+        function createTrunkGlow() {
+            if (!trunkIndices.length) return;
+
+            const baseGeo = particles.geometry;
+            const s = baseGeo.attributes.tS;
+
+            const tGeo = new THREE.BufferGeometry();
+            const tPos = new Float32Array(trunkIndices.length * 3);
+            const tCols = new Float32Array(trunkIndices.length * 3);
+
+            for (let j = 0; j < trunkIndices.length; j++) {
+                const i = trunkIndices[j];
+                const ix = i * 3;
+
+                tPos[j*3]   = s.array[ix];
+                tPos[j*3+1] = s.array[ix+1];
+                tPos[j*3+2] = s.array[ix+2];
+
+                const y = tPos[j*3+1];
+                const k = THREE.MathUtils.clamp((y + 5.2) / 2.2, 0, 1);
+                const c = new THREE.Color().setHSL(0.08, 0.75, 0.25 + 0.35 * k);
+                tCols[j*3] = c.r; tCols[j*3+1] = c.g; tCols[j*3+2] = c.b;
+            }
+
+            tGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+            tGeo.setAttribute('color', new THREE.BufferAttribute(tCols, 3));
+
+            trunkMaterial = new THREE.PointsMaterial({
+                size: 0.40,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.65,
+                depthWrite: false,
+                depthTest: true,
+                blending: THREE.AdditiveBlending
+            });
+
+            trunkParticles = new THREE.Points(tGeo, trunkMaterial);
+            trunkParticles.renderOrder = 7;
+            mainGroup.add(trunkParticles);
+        }
+
+        // === LÕI THÂN CÂY (CORE GLOW) ===
+        function createTrunkCoreGlow() {
+            if (!trunkCoreIndices.length) return;
+
+            const baseGeo = particles.geometry;
+            const s = baseGeo.attributes.tS;
+
+            const cGeo = new THREE.BufferGeometry();
+            const cPos = new Float32Array(trunkCoreIndices.length * 3);
+            const cCols = new Float32Array(trunkCoreIndices.length * 3);
+
+            for (let j = 0; j < trunkCoreIndices.length; j++) {
+                const i = trunkCoreIndices[j];
+                const ix = i * 3;
+
+                cPos[j*3]   = s.array[ix];
+                cPos[j*3+1] = s.array[ix+1];
+                cPos[j*3+2] = s.array[ix+2];
+
+                const y = cPos[j*3+1];
+                const k = THREE.MathUtils.clamp((y + 5.2) / 2.2, 0, 1);
+                const c = new THREE.Color().setHSL(0.10, 0.95, 0.55 + 0.12 * k);
+                cCols[j*3] = c.r; cCols[j*3+1] = c.g; cCols[j*3+2] = c.b;
+            }
+
+            cGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3));
+            cGeo.setAttribute('color', new THREE.BufferAttribute(cCols, 3));
+
+            trunkCoreMaterial = new THREE.PointsMaterial({
+                size: 0.78,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.92,
+                depthWrite: false,
+                depthTest: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            trunkCoreParticles = new THREE.Points(cGeo, trunkCoreMaterial);
+            trunkCoreParticles.renderOrder = 8;
+            mainGroup.add(trunkCoreParticles);
+        }
+
         function createParticles() {
+            lightIndices = [];
+            leafSparkleIndices = [];
+            trunkIndices = [];
+            trunkCoreIndices = [];
+
+            const LIGHT_RATIO = 0.06;      // đèn Noel
+            const SPARKLE_RATIO = 0.05;    // <<< B: mật độ sparkle lá (tăng/giảm ở đây)
+
             const geo = new THREE.BufferGeometry();
-            const pos = new Float32Array(PARTICLE_COUNT * 3), tS = new Float32Array(PARTICLE_COUNT * 3), tH = new Float32Array(PARTICLE_COUNT * 3), tG = new Float32Array(PARTICLE_COUNT * 3), cols = new Float32Array(PARTICLE_COUNT * 3);
+            const pos = new Float32Array(PARTICLE_COUNT * 3),
+                  tS = new Float32Array(PARTICLE_COUNT * 3),
+                  tH = new Float32Array(PARTICLE_COUNT * 3),
+                  tG = new Float32Array(PARTICLE_COUNT * 3),
+                  cols = new Float32Array(PARTICLE_COUNT * 3);
             const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111]; 
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -135,12 +360,27 @@
                     const r = Math.sqrt(Math.random()) * rMax;
                     const a = Math.random() * Math.PI * 2;
                     tS[i*3] = Math.cos(a) * r; tS[i*3+1] = h + 1; tS[i*3+2] = Math.sin(a) * r;
+
+                    // ưu tiên đèn Noel trước, nếu không trúng thì mới xét sparkle
+                    if (Math.random() < LIGHT_RATIO) {
+                        lightIndices.push(i);
+                    } else if (Math.random() < SPARKLE_RATIO) {
+                        leafSparkleIndices.push(i);
+                    }
+
                 } else {
                     const hTrunk = Math.random() * 2 - 5.5; 
                     const rTrunk = Math.random() * 0.6;
                     const aTrunk = Math.random() * Math.PI * 2;
-                    tS[i*3] = Math.cos(aTrunk) * rTrunk; tS[i*3+1] = hTrunk + 1; tS[i*3+2] = Math.sin(aTrunk) * rTrunk;
-                    cols[i*3] = 0.05; cols[i*3+1] = 0.05; cols[i*3+2] = 0.05;
+
+                    tS[i*3] = Math.cos(aTrunk) * rTrunk;
+                    tS[i*3+1] = hTrunk + 1;
+                    tS[i*3+2] = Math.sin(aTrunk) * rTrunk;
+
+                    cols[i*3] = 0.20; cols[i*3+1] = 0.12; cols[i*3+2] = 0.06;
+
+                    trunkIndices.push(i);
+                    if (rTrunk < 0.22) trunkCoreIndices.push(i);
                 }
 
                 const t = Math.random() * Math.PI * 2;
@@ -155,6 +395,7 @@
                 tG[i*3+1] = noiseY * (1 - (dist/18));
                 tG[i*3+2] = Math.sin(angle + (branch * Math.PI / 2)) * dist;
             }
+
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('tS', new THREE.BufferAttribute(tS, 3));
             geo.setAttribute('tH', new THREE.BufferAttribute(tH, 3));
@@ -163,9 +404,14 @@
             
             particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.18, vertexColors: true, transparent: true, opacity: 0.85 }));
             mainGroup.add(particles);
+
+            createLights();
+            createLeafSparkles();   // <<< B layer
+            createTrunkGlow();
+            createTrunkCoreGlow();
         }
 
-        // Ngôi sao tuyết: đặt đúng đỉnh cây + quay cùng quỹ đạo với mainGroup (cây thông)
+        // === NGÔI SAO 3D "ORNAMENT" PHỒNG + THẲNG ===
         function createUltimateSnowflake() {
             snowflakeGroup = new THREE.Group();
 
@@ -187,71 +433,137 @@
                 return tex;
             };
 
-            const glowTex = makeRadialTexture(256, 0, 120);
-            const sparkleTex = makeRadialTexture(128, 0, 38);
+            const makeGlitterTexture = (size = 256) => {
+                const c = document.createElement('canvas');
+                c.width = c.height = size;
+                const ctx = c.getContext('2d');
+                const img = ctx.createImageData(size, size);
 
-            const iceMat = new THREE.MeshBasicMaterial({
-                color: 0xEAF6FF,
-                transparent: true,
-                opacity: 0.9,
-                side: THREE.DoubleSide,
+                for (let i = 0; i < img.data.length; i += 4) {
+                    const r = Math.random();
+                    let v;
+                    if (r < 0.07) v = 255;
+                    else if (r < 0.20) v = 220;
+                    else v = 120 + Math.floor(Math.random() * 80);
+                    img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 255;
+                }
+                ctx.putImageData(img, 0, 0);
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(3.6, 3.6);
+                tex.needsUpdate = true;
+                return tex;
+            };
+
+            const glowTex = makeRadialTexture(256, 0, 135);
+            const sparkleTex = makeRadialTexture(128, 0, 42);
+            const glitterTex = makeGlitterTexture(256);
+
+            starMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFD700,
+                emissive: 0x5c4500,
+                emissiveIntensity: 0.22,
+                metalness: 0.82,
+                roughness: 0.30,
+                bumpMap: glitterTex,
+                bumpScale: 0.14,
+                roughnessMap: glitterTex,
                 depthWrite: false
             });
 
-            const iceMatSoft = iceMat.clone();
-            iceMatSoft.opacity = 0.55;
-
-            const createStar = (points = 5, outerR = 1.25, innerR = 0.55) => {
-                const shape = new THREE.Shape();
-                const step = Math.PI / points;
-
-                for (let i = 0; i < points * 2; i++) {
+            const makeStar2DPoints = (outerR, innerR) => {
+                const pts = [];
+                const step = Math.PI / 5;
+                for (let i = 0; i < 10; i++) {
                     const r = (i % 2 === 0) ? outerR : innerR;
                     const a = i * step - Math.PI / 2;
-                    const x = Math.cos(a) * r;
-                    const y = Math.sin(a) * r;
-                    if (i === 0) shape.moveTo(x, y);
-                    else shape.lineTo(x, y);
+                    pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, isTip: (i % 2 === 0) });
                 }
-                shape.closePath();
-
-                const geo = new THREE.ShapeGeometry(shape);
-                return new THREE.Mesh(geo, iceMat);
+                return pts;
             };
 
-            const starMain = createStar(5, 1.25, 0.55);
-            snowflakeGroup.add(starMain);
+            const buildOrnamentStarGeometry = () => {
+                const pts = makeStar2DPoints(1.65, 0.72);
 
-            const starInner = createStar(5, 0.95, 0.42);
-            starInner.material = iceMatSoft;
-            starInner.rotation.z = Math.PI / 10;
-            starInner.position.z = 0.01;
-            snowflakeGroup.add(starInner);
+                const tipFrontZ  = 0.95;
+                const tipBackZ   = -0.95;
 
-            const rayGeo = new THREE.PlaneGeometry(0.05, 0.9);
-            for (let i = 0; i < 5; i++) {
-                const r = new THREE.Mesh(rayGeo, iceMatSoft);
-                r.position.y = 0.25;
-                r.rotation.z = (i * Math.PI * 2) / 5;
-                r.position.z = 0.02;
-                snowflakeGroup.add(r);
-            }
+                const innerFrontZ = 0.22;
+                const innerBackZ  = -0.22;
+
+                const positions = [];
+                const indices = [];
+
+                const frontIdx = [];
+                const backIdx = [];
+
+                for (let i = 0; i < pts.length; i++) {
+                    const zF = pts[i].isTip ? tipFrontZ : innerFrontZ;
+                    const zB = pts[i].isTip ? tipBackZ  : innerBackZ;
+
+                    frontIdx[i] = positions.length / 3;
+                    positions.push(pts[i].x, pts[i].y, zF);
+
+                    backIdx[i] = positions.length / 3;
+                    positions.push(pts[i].x, pts[i].y, zB);
+                }
+
+                const centerFront = positions.length / 3;
+                positions.push(0, 0, 0.35);
+                const centerBack = positions.length / 3;
+                positions.push(0, 0, -0.35);
+
+                const n = pts.length;
+
+                for (let i = 0; i < n; i++) {
+                    const a = frontIdx[i];
+                    const b = frontIdx[(i + 1) % n];
+                    indices.push(centerFront, a, b);
+                }
+
+                for (let i = 0; i < n; i++) {
+                    const a = backIdx[i];
+                    const b = backIdx[(i + 1) % n];
+                    indices.push(centerBack, b, a);
+                }
+
+                for (let i = 0; i < n; i++) {
+                    const f0 = frontIdx[i];
+                    const f1 = frontIdx[(i + 1) % n];
+                    const b0 = backIdx[i];
+                    const b1 = backIdx[(i + 1) % n];
+
+                    indices.push(f0, f1, b1);
+                    indices.push(f0, b1, b0);
+                }
+
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geo.setIndex(indices);
+                geo.computeVertexNormals();
+                geo.center();
+                return geo;
+            };
+
+            const starMesh = new THREE.Mesh(buildOrnamentStarGeometry(), starMaterial);
+            starMesh.rotation.set(0, 0, 0);
+            snowflakeGroup.add(starMesh);
 
             const glowMat = new THREE.SpriteMaterial({
                 map: glowTex,
                 transparent: true,
-                opacity: 0.22,
+                opacity: 0.18,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             });
             snowflakeGlow = new THREE.Sprite(glowMat);
-            snowflakeGlow.scale.set(3.2, 3.2, 1);
-            snowflakeGlow.position.set(0, 0, -0.05);
+            snowflakeGlow.scale.set(4.1, 4.1, 1);
+            snowflakeGlow.position.set(0, 0, -1.2);
             snowflakeGroup.add(snowflakeGlow);
 
             snowflakeSparkles = [];
-            const sparkleCount = 46;
-
+            const sparkleCount = 80;
             for (let i = 0; i < sparkleCount; i++) {
                 const sm = new THREE.SpriteMaterial({
                     map: sparkleTex,
@@ -262,29 +574,30 @@
                 });
 
                 const sp = new THREE.Sprite(sm);
-
-                const r = 1.45 * Math.sqrt(Math.random());
+                const r = 1.85 * Math.sqrt(Math.random());
                 const a = Math.random() * Math.PI * 2;
-                sp.position.set(Math.cos(a) * r, Math.sin(a) * r, 0.06);
+                const z = (Math.random() - 0.5) * 1.4;
+                sp.position.set(Math.cos(a) * r, Math.sin(a) * r, z);
 
-                const baseScale = 0.18 + Math.random() * 0.22;
+                const baseScale = 0.10 + Math.random() * 0.26;
                 sp.scale.set(baseScale, baseScale, 1);
 
                 snowflakeSparkles.push({
                     sprite: sp,
                     baseScale,
-                    baseOpacity: 0.22 + Math.random() * 0.38,
+                    baseOpacity: 0.15 + Math.random() * 0.50,
                     phase: Math.random() * Math.PI * 2,
-                    speed: 1.6 + Math.random() * 2.4
+                    speed: 1.8 + Math.random() * 3.2
                 });
 
                 snowflakeGroup.add(sp);
             }
 
-            // Đặt sao đúng đỉnh cây (tầm y ~ 5 của cây thông) + GẮN VÀO mainGroup để quay cùng quỹ đạo
-            snowflakeGroup.position.y = 5.35;
+            snowflakeGroup.position.set(0, 5.35, 0);
             snowflakeGroup.scale.setScalar(0.78);
-            mainGroup.add(snowflakeGroup);
+            snowflakeGroup.rotation.set(0, 0, 0);
+
+            scene.add(snowflakeGroup);
         }
 
         async function setupMediaPipe() {
@@ -307,7 +620,7 @@
             fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
             fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
             
-            // Xoay toàn bộ Group
+            // Cây thông (hạt) vẫn xoay như cũ
             mainGroup.rotation.y += 0.008; 
 
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
@@ -320,43 +633,104 @@
             }
             p.needsUpdate = true;
 
+            const isTree = (fHeart < 0.1 && fGalaxy < 0.1);
+            const tt = performance.now() * 0.001;
+
+            // Đèn Noel lá
+            if (lightParticles) {
+                lightParticles.visible = isTree;
+                const lp = lightParticles.geometry.attributes.position;
+                for (let j = 0; j < lightIndices.length; j++) {
+                    const i = lightIndices[j];
+                    const ix = i * 3;
+                    lp.array[j*3]   = p.array[ix];
+                    lp.array[j*3+1] = p.array[ix+1];
+                    lp.array[j*3+2] = p.array[ix+2];
+                }
+                lp.needsUpdate = true;
+
+                lightMaterial.opacity = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(tt * 6.0));
+                lightMaterial.size = 0.36 + 0.10 * (0.5 + 0.5 * Math.sin(tt * 5.2));
+            }
+
+            // === B: Sparkle layer trên lá ===
+            if (leafSparkles) {
+                leafSparkles.visible = isTree;
+
+                const spPos = leafSparkles.geometry.attributes.position;
+                for (let j = 0; j < leafSparkleIndices.length; j++) {
+                    const i = leafSparkleIndices[j];
+                    const ix = i * 3;
+                    spPos.array[j*3]   = p.array[ix];
+                    spPos.array[j*3+1] = p.array[ix+1];
+                    spPos.array[j*3+2] = p.array[ix+2];
+                }
+                spPos.needsUpdate = true;
+
+                // nhấp nháy từng điểm bằng cách update color intensity
+                if (leafSparkleCols && leafSparkleBaseCols && leafSparklePhase && leafSparkleSpeed) {
+                    const carr = leafSparkleCols.array;
+                    for (let j = 0; j < leafSparkleIndices.length; j++) {
+                        const tw = 0.10 + 0.90 * (0.5 + 0.5 * Math.sin(tt * leafSparkleSpeed[j] + leafSparklePhase[j]));
+                        const boost = tw * tw; // tw^2 cho “nháy” sắc hơn
+                        carr[j*3]   = leafSparkleBaseCols[j*3]   * (0.25 + 0.90 * boost);
+                        carr[j*3+1] = leafSparkleBaseCols[j*3+1] * (0.25 + 0.90 * boost);
+                        carr[j*3+2] = leafSparkleBaseCols[j*3+2] * (0.25 + 0.90 * boost);
+                    }
+                    leafSparkleCols.needsUpdate = true;
+                }
+
+                // nhịp thở chung nhẹ để nhìn tự nhiên
+                leafSparkleMat.opacity = 0.10 + 0.35 * (0.5 + 0.5 * Math.sin(tt * 1.8));
+                leafSparkleMat.size = 0.52 + 0.12 * (0.5 + 0.5 * Math.sin(tt * 2.2));
+            }
+
+            // Glow thân
+            if (trunkParticles) {
+                trunkParticles.visible = isTree;
+                trunkMaterial.opacity = 0.55 + 0.15 * (0.5 + 0.5 * Math.sin(tt * 2.4));
+            }
+
+            // CORE thân (điểm nhấn)
+            if (trunkCoreParticles) {
+                trunkCoreParticles.visible = isTree;
+                trunkCoreMaterial.opacity = 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(tt * 3.6));
+                trunkCoreMaterial.size = 0.72 + 0.14 * (0.5 + 0.5 * Math.sin(tt * 2.8));
+            }
+
             photoPairs.forEach(pair => {
-                // Tính toán vị trí hạt bay
                 const pos = new THREE.Vector3(0,0,0);
                 pos.lerp(pair.group.userData.posHeart, fHeart);
                 pos.lerp(pair.group.userData.posGalaxy, fGalaxy);
                 pair.group.position.copy(pos);
 
-                // KỸ THUẬT BILLBOARD: Đảm bảo ảnh luôn hướng về camera
-                // Chúng ta lấy góc xoay ngược lại với mainGroup để ảnh không bị xoay theo
                 pair.group.rotation.y = -mainGroup.rotation.y;
 
                 pair.photoMat.opacity = Math.max(fHeart, fGalaxy);
                 pair.borderMat.opacity = Math.max(fHeart, fGalaxy);
             });
 
+            // Sao đứng yên: chỉ lấp lánh (không xoay)
             if (snowflakeGroup) {
-                const showSnowflake = (fHeart < 0.1 && fGalaxy < 0.1);
-                snowflakeGroup.visible = showSnowflake;
+                snowflakeGroup.visible = isTree;
 
-                if (showSnowflake) {
-                    const t = performance.now() * 0.001;
-
-                    // vẫn có xoay nhẹ riêng để “lấp lánh sống”
-                    snowflakeGroup.rotation.z += 0.02;
+                if (isTree) {
+                    if (starMaterial) {
+                        starMaterial.emissiveIntensity = 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(tt * 2.4));
+                    }
 
                     if (snowflakeGlow) {
-                        const pGlow = 0.5 + 0.5 * Math.sin(t * 1.6);
-                        snowflakeGlow.material.opacity = 0.14 + 0.14 * pGlow;
-                        const sGlow = 3.0 + 0.35 * pGlow;
+                        const pGlow = 0.5 + 0.5 * Math.sin(tt * 1.7);
+                        snowflakeGlow.material.opacity = 0.10 + 0.12 * pGlow;
+                        const sGlow = 3.8 + 0.55 * pGlow;
                         snowflakeGlow.scale.set(sGlow, sGlow, 1);
                     }
 
                     for (let i = 0; i < snowflakeSparkles.length; i++) {
                         const sp = snowflakeSparkles[i];
-                        const tw = 0.5 + 0.5 * Math.sin(t * sp.speed + sp.phase);
-                        sp.sprite.material.opacity = sp.baseOpacity * (0.15 + 0.85 * tw);
-                        const sc = sp.baseScale * (0.75 + 0.65 * tw);
+                        const tw = 0.5 + 0.5 * Math.sin(tt * sp.speed + sp.phase);
+                        sp.sprite.material.opacity = sp.baseOpacity * (0.10 + 0.90 * tw);
+                        const sc = sp.baseScale * (0.65 + 0.85 * tw);
                         sp.sprite.scale.set(sc, sc, 1);
                     }
                 }
