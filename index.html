@@ -11,6 +11,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
 
+    <!-- Font đẹp, hỗ trợ tiếng Việt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800;900&display=swap" rel="stylesheet">
+
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #bg-image { position: fixed; inset: 0; background: url('https://images.unsplash.com/photo-1543589077-47d81606c1bf?q=80&w=2070') center/cover; filter: brightness(0.1); z-index: -1; }
@@ -30,20 +35,124 @@
         #start-btn:hover { background: #ff4d4d; transform: scale(1.1); }
         #video-container { position: absolute; bottom: 20px; right: 20px; width: 160px; height: 120px; border-radius: 8px; overflow: hidden; transform: scaleX(-1); border: 1px solid #333; }
         video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* === TEXT CHỈ HIỆN KHI Ở CHẾ ĐỘ CÂY THÔNG (màu vàng + lấp lánh) === */
+        #greeting {
+            position: fixed;
+            top: 18px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+
+            font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-size: clamp(22px, 3.2vw, 46px);
+            font-weight: 900;
+            letter-spacing: 0.6px;
+
+            /* vàng ánh kim chạy */
+            background: linear-gradient(
+                110deg,
+                rgba(255, 215, 0, 0.35) 0%,
+                rgba(255, 239, 170, 1) 18%,
+                rgba(255, 215, 0, 1) 40%,
+                rgba(255, 250, 220, 1) 52%,
+                rgba(255, 215, 0, 1) 70%,
+                rgba(255, 215, 0, 0.35) 100%
+            );
+            background-size: 260% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+
+            /* glow vàng */
+            text-shadow:
+                0 0 10px rgba(255, 215, 0, 0.30),
+                0 0 22px rgba(255, 215, 0, 0.18),
+                0 2px 0 rgba(0, 0, 0, 0.35);
+
+            z-index: 160;
+            pointer-events: none;
+            display: none;
+
+            animation: textShimmer 2.2s linear infinite, textTwinkle 1.6s ease-in-out infinite;
+        }
+
+        /* sparkle dust nhẹ */
+        #greeting::after {
+            content: "";
+            position: absolute;
+            inset: -10px 0 -10px 0;
+            pointer-events: none;
+
+            background:
+                radial-gradient(circle at 12% 45%, rgba(255,255,255,0.65) 0 2px, transparent 3px),
+                radial-gradient(circle at 28% 25%, rgba(255,255,255,0.55) 0 1.6px, transparent 3px),
+                radial-gradient(circle at 44% 55%, rgba(255,255,255,0.60) 0 1.8px, transparent 3px),
+                radial-gradient(circle at 61% 30%, rgba(255,255,255,0.50) 0 1.5px, transparent 3px),
+                radial-gradient(circle at 73% 60%, rgba(255,255,255,0.62) 0 1.9px, transparent 3px),
+                radial-gradient(circle at 88% 40%, rgba(255,255,255,0.55) 0 1.6px, transparent 3px);
+            opacity: 0.0;
+            filter: blur(0.2px);
+            animation: sparkleDust 1.25s ease-in-out infinite;
+        }
+
+        /* ❤️ icon ở cuối câu */
+        #greeting .heart{
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 0.95em;
+            line-height: 1;
+            filter: drop-shadow(0 0 10px rgba(255, 40, 40, 0.45));
+            animation: heartBeat 1.2s ease-in-out infinite;
+        }
+
+        @keyframes textShimmer {
+            0%   { background-position: 0% 50%; }
+            100% { background-position: 260% 50%; }
+        }
+
+        @keyframes textTwinkle {
+            0%, 100% {
+                filter: drop-shadow(0 0 0 rgba(255,215,0,0));
+                transform: translateY(0);
+            }
+            50% {
+                filter: drop-shadow(0 0 10px rgba(255,215,0,0.20));
+                transform: translateY(-0.5px);
+            }
+        }
+
+        @keyframes sparkleDust {
+            0%, 100% { opacity: 0.05; transform: translateY(0); }
+            50%      { opacity: 0.35; transform: translateY(-1px); }
+        }
+
+        @keyframes heartBeat{
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.18); }
+        }
     </style>
 </head>
 <body>
 
     <div id="bg-image"></div>
+    <div id="greeting">Chúc em yêu giáng sinh vui vẻ <span class="heart">❤️</span></div>
+
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="start-overlay"><button id="start-btn">Quà giáng sinh của bé nè ^^</button></div>
     <div id="video-container"><video id="webcam" autoplay playsinline></video></div>
 
     <script>
-        const PARTICLE_COUNT = 35000; 
+        const PARTICLE_COUNT = 35000;
+
+        // === DỜI CÂY THÔNG XÍCH XUỐNG (CHỈ CHẾ ĐỘ CÂY THÔNG) ===
+        const TREE_Y_OFFSET = -0.85;
+
         let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
         let snowflakeSparkles = [], snowflakeGlow;
-        let starMaterial; // dùng để nhấp nháy lấp lánh nhẹ
+        let starMaterial;
+
+        let greetingEl;
 
         // === ĐÈN NOEL (lá cây) ===
         let lightParticles, lightMaterial;
@@ -78,7 +187,8 @@
         async function init() {
             scene = new THREE.Scene();
 
-            // Đèn để sao 3D nổi khối thật hơn
+            greetingEl = document.getElementById('greeting');
+
             const amb = new THREE.AmbientLight(0xffffff, 0.62);
             scene.add(amb);
             const dir = new THREE.DirectionalLight(0xffffff, 1.05);
@@ -141,7 +251,6 @@
             });
         }
 
-        // === ĐÈN NOEL (lá) ===
         function createLights() {
             if (!lightIndices.length) return;
 
@@ -185,7 +294,6 @@
             mainGroup.add(lightParticles);
         }
 
-        // === LÁ CÂY SPARKLES (B) ===
         function createLeafSparkles() {
             if (!leafSparkleIndices.length) return;
 
@@ -199,7 +307,6 @@
             const phase = new Float32Array(leafSparkleIndices.length);
             const speed = new Float32Array(leafSparkleIndices.length);
 
-            // màu sparkle kiểu “tuyết lấp lánh” (lạnh, trắng, hơi xanh)
             const sparklePalette = [0xffffff, 0xf2f7ff, 0xe6f2ff, 0xdff6ff];
 
             for (let j = 0; j < leafSparkleIndices.length; j++) {
@@ -232,12 +339,12 @@
             leafSparkleSpeed = speed;
 
             leafSparkleMat = new THREE.PointsMaterial({
-                size: 0.56,                 // sparkle to hơn hạt lá bình thường
+                size: 0.56,
                 vertexColors: true,
                 transparent: true,
                 opacity: 0.0,
                 depthWrite: false,
-                depthTest: false,           // để không bị “chìm” vào lá
+                depthTest: false,
                 blending: THREE.AdditiveBlending
             });
 
@@ -246,7 +353,6 @@
             mainGroup.add(leafSparkles);
         }
 
-        // === THÂN CÂY glow thường (ấm hơn, thấy rõ hơn) ===
         function createTrunkGlow() {
             if (!trunkIndices.length) return;
 
@@ -289,7 +395,6 @@
             mainGroup.add(trunkParticles);
         }
 
-        // === LÕI THÂN CÂY (CORE GLOW) ===
         function createTrunkCoreGlow() {
             if (!trunkCoreIndices.length) return;
 
@@ -338,8 +443,8 @@
             trunkIndices = [];
             trunkCoreIndices = [];
 
-            const LIGHT_RATIO = 0.06;      // đèn Noel
-            const SPARKLE_RATIO = 0.05;    // <<< B: mật độ sparkle lá (tăng/giảm ở đây)
+            const LIGHT_RATIO = 0.06;
+            const SPARKLE_RATIO = 0.05;
 
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(PARTICLE_COUNT * 3),
@@ -361,7 +466,6 @@
                     const a = Math.random() * Math.PI * 2;
                     tS[i*3] = Math.cos(a) * r; tS[i*3+1] = h + 1; tS[i*3+2] = Math.sin(a) * r;
 
-                    // ưu tiên đèn Noel trước, nếu không trúng thì mới xét sparkle
                     if (Math.random() < LIGHT_RATIO) {
                         lightIndices.push(i);
                     } else if (Math.random() < SPARKLE_RATIO) {
@@ -406,12 +510,11 @@
             mainGroup.add(particles);
 
             createLights();
-            createLeafSparkles();   // <<< B layer
+            createLeafSparkles();
             createTrunkGlow();
             createTrunkCoreGlow();
         }
 
-        // === NGÔI SAO 3D "ORNAMENT" PHỒNG + THẲNG ===
         function createUltimateSnowflake() {
             snowflakeGroup = new THREE.Group();
 
@@ -619,24 +722,33 @@
         function render() {
             fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
             fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
-            
-            // Cây thông (hạt) vẫn xoay như cũ
+
+            const isTree = (fHeart < 0.1 && fGalaxy < 0.1);
+            const tt = performance.now() * 0.001;
+
+            if (greetingEl) greetingEl.style.display = isTree ? 'block' : 'none';
+
             mainGroup.rotation.y += 0.008; 
 
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const ix=i*3, iy=i*3+1, iz=i*3+2;
                 let tx = s.array[ix], ty = s.array[iy], tz = s.array[iz];
-                tx = THREE.MathUtils.lerp(tx, h.array[ix], fHeart); ty = THREE.MathUtils.lerp(ty, h.array[iy], fHeart); tz = THREE.MathUtils.lerp(tz, h.array[iz], fHeart);
-                tx = THREE.MathUtils.lerp(tx, g.array[ix], fGalaxy); ty = THREE.MathUtils.lerp(ty, g.array[iy], fGalaxy); tz = THREE.MathUtils.lerp(tz, g.array[iz], fGalaxy);
+
+                tx = THREE.MathUtils.lerp(tx, h.array[ix], fHeart);
+                ty = THREE.MathUtils.lerp(ty, h.array[iy], fHeart);
+                tz = THREE.MathUtils.lerp(tz, h.array[iz], fHeart);
+
+                tx = THREE.MathUtils.lerp(tx, g.array[ix], fGalaxy);
+                ty = THREE.MathUtils.lerp(ty, g.array[iy], fGalaxy);
+                tz = THREE.MathUtils.lerp(tz, g.array[iz], fGalaxy);
+
+                if (isTree) ty += TREE_Y_OFFSET;
+
                 p.array[ix] = tx; p.array[iy] = ty; p.array[iz] = tz;
             }
             p.needsUpdate = true;
 
-            const isTree = (fHeart < 0.1 && fGalaxy < 0.1);
-            const tt = performance.now() * 0.001;
-
-            // Đèn Noel lá
             if (lightParticles) {
                 lightParticles.visible = isTree;
                 const lp = lightParticles.geometry.attributes.position;
@@ -653,7 +765,6 @@
                 lightMaterial.size = 0.36 + 0.10 * (0.5 + 0.5 * Math.sin(tt * 5.2));
             }
 
-            // === B: Sparkle layer trên lá ===
             if (leafSparkles) {
                 leafSparkles.visible = isTree;
 
@@ -667,12 +778,11 @@
                 }
                 spPos.needsUpdate = true;
 
-                // nhấp nháy từng điểm bằng cách update color intensity
                 if (leafSparkleCols && leafSparkleBaseCols && leafSparklePhase && leafSparkleSpeed) {
                     const carr = leafSparkleCols.array;
                     for (let j = 0; j < leafSparkleIndices.length; j++) {
                         const tw = 0.10 + 0.90 * (0.5 + 0.5 * Math.sin(tt * leafSparkleSpeed[j] + leafSparklePhase[j]));
-                        const boost = tw * tw; // tw^2 cho “nháy” sắc hơn
+                        const boost = tw * tw;
                         carr[j*3]   = leafSparkleBaseCols[j*3]   * (0.25 + 0.90 * boost);
                         carr[j*3+1] = leafSparkleBaseCols[j*3+1] * (0.25 + 0.90 * boost);
                         carr[j*3+2] = leafSparkleBaseCols[j*3+2] * (0.25 + 0.90 * boost);
@@ -680,18 +790,15 @@
                     leafSparkleCols.needsUpdate = true;
                 }
 
-                // nhịp thở chung nhẹ để nhìn tự nhiên
                 leafSparkleMat.opacity = 0.10 + 0.35 * (0.5 + 0.5 * Math.sin(tt * 1.8));
                 leafSparkleMat.size = 0.52 + 0.12 * (0.5 + 0.5 * Math.sin(tt * 2.2));
             }
 
-            // Glow thân
             if (trunkParticles) {
                 trunkParticles.visible = isTree;
                 trunkMaterial.opacity = 0.55 + 0.15 * (0.5 + 0.5 * Math.sin(tt * 2.4));
             }
 
-            // CORE thân (điểm nhấn)
             if (trunkCoreParticles) {
                 trunkCoreParticles.visible = isTree;
                 trunkCoreMaterial.opacity = 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(tt * 3.6));
@@ -710,9 +817,9 @@
                 pair.borderMat.opacity = Math.max(fHeart, fGalaxy);
             });
 
-            // Sao đứng yên: chỉ lấp lánh (không xoay)
             if (snowflakeGroup) {
                 snowflakeGroup.visible = isTree;
+                if (isTree) snowflakeGroup.position.y = 5.35 + TREE_Y_OFFSET;
 
                 if (isTree) {
                     if (starMaterial) {
