@@ -42,6 +42,7 @@
     <script>
         const PARTICLE_COUNT = 35000; 
         let scene, camera, renderer, particles, snowflakeGroup, ytPlayer;
+        let snowflakeSparkles = [], snowflakeGlow;
         let handTracker, videoElement, mainGroup;
         let fHeart = 0, fGalaxy = 0;
         let tHeart = 0, tGalaxy = 0;
@@ -166,30 +167,136 @@
 
         function createUltimateSnowflake() {
             snowflakeGroup = new THREE.Group();
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide });
+
+            // Texture tròn lấp lánh (procedural) để nhìn "thật" hơn
+            const makeRadialTexture = (size, inner, outer) => {
+                const c = document.createElement('canvas');
+                c.width = c.height = size;
+                const ctx = c.getContext('2d');
+
+                const g = ctx.createRadialGradient(size/2, size/2, inner, size/2, size/2, outer);
+                g.addColorStop(0.0, 'rgba(255,255,255,1)');
+                g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+                g.addColorStop(1.0, 'rgba(255,255,255,0)');
+
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, size, size);
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            };
+
+            const glowTex = makeRadialTexture(256, 0, 120);
+            const sparkleTex = makeRadialTexture(128, 0, 38);
+
+            // Material băng tuyết nhẹ, có độ trong + không ghi depth để đỡ "cứng"
+            const iceMat = new THREE.MeshBasicMaterial({
+                color: 0xEAF6FF,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+
+            // Tạo nhánh tuyết chi tiết hơn một chút (giữ cấu trúc cũ nhưng làm “crystal” hơn)
             const createComplexBranch = () => {
                 const branch = new THREE.Group();
-                const main = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 1.8), mat);
-                main.position.y = 0.9; branch.add(main);
-                const diamond = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), mat);
-                diamond.rotation.z = Math.PI / 4; diamond.position.y = 0.8; branch.add(diamond);
-                for(let i=1; i<=3; i++) {
-                    const pos = i * 0.45, len = 0.6 - (i * 0.12);
-                    const left = new THREE.Mesh(new THREE.PlaneGeometry(0.025, len), mat);
-                    left.position.set(-len/4, pos, 0); left.rotation.z = Math.PI / 4;
-                    const right = left.clone(); right.position.x = len/4; right.rotation.z = -Math.PI / 4;
+
+                const main = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 1.95), iceMat);
+                main.position.y = 0.97;
+                branch.add(main);
+
+                const diamond = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), iceMat);
+                diamond.rotation.z = Math.PI / 4;
+                diamond.position.y = 0.88;
+                branch.add(diamond);
+
+                // răng cưa hai bên
+                for (let i = 1; i <= 4; i++) {
+                    const pos = i * 0.42;
+                    const len = 0.62 - (i * 0.11);
+
+                    const left = new THREE.Mesh(new THREE.PlaneGeometry(0.022, len), iceMat);
+                    left.position.set(-len/4, pos, 0);
+                    left.rotation.z = Math.PI / 4;
+
+                    const right = left.clone();
+                    right.position.x = len/4;
+                    right.rotation.z = -Math.PI / 4;
+
                     branch.add(left, right);
                 }
+
+                // tip nhỏ ở đầu nhánh cho nhìn sắc nét hơn
+                const tip = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.18), iceMat);
+                tip.position.y = 1.78;
+                branch.add(tip);
+
                 return branch;
             };
+
             for (let i = 0; i < 6; i++) {
-                const b = createComplexBranch(); b.rotation.z = (i * Math.PI) / 3; snowflakeGroup.add(b);
+                const b = createComplexBranch();
+                b.rotation.z = (i * Math.PI) / 3;
+                snowflakeGroup.add(b);
             }
-            const centerGeo = new THREE.RingGeometry(0.1, 0.15, 6);
-            const centerRing = new THREE.Mesh(centerGeo, mat);
-            centerRing.rotation.z = Math.PI / 2; snowflakeGroup.add(centerRing);
-            snowflakeGroup.position.y = 5.0; 
-            snowflakeGroup.scale.setScalar(0.75);
+
+            const centerGeo = new THREE.RingGeometry(0.11, 0.18, 6);
+            const centerRing = new THREE.Mesh(centerGeo, iceMat);
+            centerRing.rotation.z = Math.PI / 2;
+            snowflakeGroup.add(centerRing);
+
+            // Glow mềm ở giữa để tuyết có “ánh băng”
+            const glowMat = new THREE.SpriteMaterial({
+                map: glowTex,
+                transparent: true,
+                opacity: 0.22,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            snowflakeGlow = new THREE.Sprite(glowMat);
+            snowflakeGlow.scale.set(3.2, 3.2, 1);
+            snowflakeGlow.position.set(0, 0.6, -0.02);
+            snowflakeGroup.add(snowflakeGlow);
+
+            // Sparkles: các đốm lấp lánh quanh cánh tuyết
+            snowflakeSparkles = [];
+            const sparkleCount = 46;
+
+            for (let i = 0; i < sparkleCount; i++) {
+                const sm = new THREE.SpriteMaterial({
+                    map: sparkleTex,
+                    transparent: true,
+                    opacity: 0.0,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+
+                const sp = new THREE.Sprite(sm);
+
+                // rải quanh tuyết, ưu tiên vùng cánh
+                const r = 1.35 * Math.sqrt(Math.random());
+                const a = Math.random() * Math.PI * 2;
+                sp.position.set(Math.cos(a) * r, 0.55 + (Math.sin(a) * r), 0.03);
+
+                const baseScale = 0.18 + Math.random() * 0.22;
+                sp.scale.set(baseScale, baseScale, 1);
+
+                const data = {
+                    sprite: sp,
+                    baseScale,
+                    baseOpacity: 0.22 + Math.random() * 0.38,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 1.6 + Math.random() * 2.4
+                };
+
+                snowflakeSparkles.push(data);
+                snowflakeGroup.add(sp);
+            }
+
+            snowflakeGroup.position.y = 5.0;
+            snowflakeGroup.scale.setScalar(0.78);
             scene.add(snowflakeGroup);
         }
 
@@ -242,9 +349,31 @@
             });
 
             if (snowflakeGroup) {
-                snowflakeGroup.visible = (fHeart < 0.1 && fGalaxy < 0.1);
-                snowflakeGroup.rotation.z += 0.02;
+                const showSnowflake = (fHeart < 0.1 && fGalaxy < 0.1);
+                snowflakeGroup.visible = showSnowflake;
+
+                if (showSnowflake) {
+                    const t = performance.now() * 0.001;
+
+                    snowflakeGroup.rotation.z += 0.02;
+
+                    if (snowflakeGlow) {
+                        const pGlow = 0.5 + 0.5 * Math.sin(t * 1.6);
+                        snowflakeGlow.material.opacity = 0.14 + 0.14 * pGlow;
+                        const sGlow = 3.0 + 0.35 * pGlow;
+                        snowflakeGlow.scale.set(sGlow, sGlow, 1);
+                    }
+
+                    for (let i = 0; i < snowflakeSparkles.length; i++) {
+                        const sp = snowflakeSparkles[i];
+                        const tw = 0.5 + 0.5 * Math.sin(t * sp.speed + sp.phase);
+                        sp.sprite.material.opacity = sp.baseOpacity * (0.15 + 0.85 * tw);
+                        const sc = sp.baseScale * (0.75 + 0.65 * tw);
+                        sp.sprite.scale.set(sc, sc, 1);
+                    }
+                }
             }
+
             renderer.render(scene, camera);
         }
     </script>
