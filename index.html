@@ -4,17 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magic Hand - Perfect Billboard Photos</title>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
 
-    <!-- Font đẹp, hỗ trợ tiếng Việt -->
+    <!-- Font đẹp, hỗ trợ tiếng Việt + font tình cảm cho OK text -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800;900&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
 
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
@@ -47,14 +47,14 @@
         }
 
         #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 200; }
-        #start-btn { 
-            padding: 20px 40px; 
-            border: 3px solid #ff4d4d; 
-            background: rgba(255, 255, 255, 0.1); 
-            color: #fff; 
-            cursor: pointer; 
-            font-size: 1.5rem; 
-            font-weight: bold; 
+        #start-btn {
+            padding: 20px 40px;
+            border: 3px solid #ff4d4d;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.5rem;
+            font-weight: bold;
             border-radius: 50px;
             transition: all 0.3s ease;
             box-shadow: 0 0 20px rgba(255, 77, 77, 0.5);
@@ -144,6 +144,88 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.18); }
         }
+
+        /* ===================== OK LOVE TEXT (hiện khi làm ký hiệu OK) ===================== */
+        #ok-love{
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(980px, calc(100% - 28px));
+            z-index: 185;
+            pointer-events: none;
+
+            display: none;
+            opacity: 0;
+
+            padding: 16px 18px 14px;
+            border-radius: 18px;
+            background: rgba(0,0,0,0.28);
+            backdrop-filter: blur(6px);
+            box-shadow:
+                0 18px 40px rgba(0,0,0,0.35),
+                0 0 28px rgba(255, 215, 0, 0.10);
+        }
+
+        #ok-love .ok-line{
+            text-align: center;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            background-image: linear-gradient(
+                105deg,
+                rgba(255,215,0,0.40) 0%,
+                rgba(255,245,190,1) 18%,
+                rgba(255,215,0,1) 42%,
+                rgba(255,255,255,1) 52%,
+                rgba(255,215,0,1) 70%,
+                rgba(255,215,0,0.40) 100%
+            );
+            background-size: 260% 100%;
+
+            text-shadow:
+                0 0 12px rgba(255, 215, 0, 0.16),
+                0 2px 0 rgba(0,0,0,0.35);
+
+            filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.08));
+        }
+
+        #ok-love .ok-title{
+            font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            font-size: clamp(18px, 2.2vw, 34px);
+            margin-bottom: 8px;
+        }
+
+        #ok-love .ok-body{
+            font-family: "Dancing Script", cursive;
+            font-weight: 700;
+            font-size: clamp(18px, 2.1vw, 28px);
+            line-height: 1.25;
+            padding: 0 6px;
+        }
+
+        #ok-love .ok-char{
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(8px);
+            will-change: transform, opacity;
+        }
+        #ok-love .ok-space{
+            display: inline-block;
+            width: 0.28em;
+        }
+
+        #ok-love .ok-cursor{
+            text-align: center;
+            margin-top: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            color: rgba(255,255,255,0.65);
+            opacity: 0.75;
+            animation: okBlink 0.8s steps(1) infinite;
+        }
+        @keyframes okBlink{ 50%{ opacity: 0; } }
     </style>
 </head>
 <body>
@@ -154,6 +236,13 @@
     <canvas id="snow-canvas"></canvas>
 
     <div id="greeting">Chúc em yêu giáng sinh vui vẻ <span class="heart">❤️</span></div>
+
+    <!-- OK LOVE TEXT (hiện khi làm ký hiệu OK) -->
+    <div id="ok-love">
+        <div class="ok-line ok-title" id="ok-line-1"></div>
+        <div class="ok-line ok-body" id="ok-line-2"></div>
+        <div class="ok-cursor" id="ok-cursor">|</div>
+    </div>
 
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="start-overlay"><button id="start-btn">Quà giáng sinh của bé nè ^^</button></div>
@@ -180,9 +269,14 @@
         let trunkCoreParticles, trunkCoreMaterial, trunkCoreIndices = [];
 
         let handTracker, videoElement, mainGroup;
-        let fHeart = 0, fGalaxy = 0;
-        let tHeart = 0, tGalaxy = 0;
-        let photoPairs = []; 
+        let fHeart = 0, fGalaxy = 0, fOk = 0;
+        let tHeart = 0, tGalaxy = 0, tOk = 0;
+        let photoPairs = [];
+
+        // OK LOVE DOM
+        let okLoveEl, okLine1El, okLine2El, okCursorEl;
+        let okTextTL = null;
+        let okTextShown = false;
 
         const driveIDs = ['1Sic5fMu3E2-WVNhflfmSCIlzphiPxFLh', '1ikC2YuAgDxVibcxShRcDrZEWGsq8R5Xb', '12ZkIlUC-6m8exE4Xkw_wdYh_ZbjcUa1S', '13zH-VZG0_IULrhFDphyMLc9iPKRX7dCz', '11dlK8KYP-fvt4Il91nwv3Ah7FEg0usl3', '1m5PvE-UdyxEtYftu1T9nQBk8BT6Hpsz5', '1t4P1QXc5fvkGFX2IBce4zBgkseMQRWJY', '11EOid82XxzbPSLRY6LkzT_mwF8G6fq5L'];
 
@@ -206,8 +300,8 @@
 
         function makeSnowflakes() {
             // (đã giảm mạnh để đỡ lag)
-            const base = Math.floor((window.innerWidth * window.innerHeight) / 11000);
-            const count = Math.max(85, Math.min(base, 220));
+            const base = Math.floor((window.innerWidth * window.innerHeight) / 13000);
+            const count = Math.max(40, Math.min(base, 110));
 
             snowFlakes = [];
             for (let i = 0; i < count; i++) {
@@ -337,6 +431,12 @@
             scene = new THREE.Scene();
             greetingEl = document.getElementById('greeting');
 
+            // OK LOVE DOM
+            okLoveEl = document.getElementById("ok-love");
+            okLine1El = document.getElementById("ok-line-1");
+            okLine2El = document.getElementById("ok-line-2");
+            okCursorEl = document.getElementById("ok-cursor");
+
             initSnowSystem();
 
             const amb = new THREE.AmbientLight(0xffffff, 0.62);
@@ -346,7 +446,7 @@
             scene.add(dir);
 
             const aspect = window.innerWidth / window.innerHeight;
-            const d = 8; 
+            const d = 8;
             camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 1000);
             camera.position.z = 25;
 
@@ -358,14 +458,14 @@
             renderer.domElement.style.zIndex = "50";
 
             document.body.appendChild(renderer.domElement);
-            
+
             mainGroup = new THREE.Group();
             scene.add(mainGroup);
 
             createParticles();
             createPhotos();
             createUltimateSnowflake();
-            
+
             await setupMediaPipe();
             gsap.ticker.add(render);
         }
@@ -376,23 +476,23 @@
             driveIDs.forEach((id, i) => {
                 const group = new THREE.Group();
                 const proxyUrl = `https://images.weserv.nl/?url=drive.google.com/uc?id=${id}`;
-                
-                const photoMat = new THREE.MeshBasicMaterial({ 
-                    map: loader.load(proxyUrl), 
-                    transparent: true, 
-                    opacity: 0, 
-                    depthWrite: false 
+
+                const photoMat = new THREE.MeshBasicMaterial({
+                    map: loader.load(proxyUrl),
+                    transparent: true,
+                    opacity: 0,
+                    depthWrite: false
                 });
-                const borderMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFD700, 
-                    transparent: true, 
-                    opacity: 0, 
+                const borderMat = new THREE.MeshBasicMaterial({
+                    color: 0xFFD700,
+                    transparent: true,
+                    opacity: 0,
                     depthWrite: false
                 });
 
                 const border = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), borderMat);
                 const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), photoMat);
-                photo.position.z = 0.01; 
+                photo.position.z = 0.01;
                 group.add(border); group.add(photo);
 
                 const angle = (i / 8) * Math.PI * 4;
@@ -607,7 +707,7 @@
                   tH = new Float32Array(PARTICLE_COUNT * 3),
                   tG = new Float32Array(PARTICLE_COUNT * 3),
                   cols = new Float32Array(PARTICLE_COUNT * 3);
-            const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111]; 
+            const palette = [0xf1c40f, 0x2ecc71, 0xffffff, 0xe74c3c, 0x111111];
 
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 const colorIdx = Math.floor(Math.random() * palette.length);
@@ -615,8 +715,8 @@
                 cols[i*3] = color.r; cols[i*3+1] = color.g; cols[i*3+2] = color.b;
 
                 if (i < PARTICLE_COUNT * 0.92) {
-                    const h = Math.random() * 8 - 4; 
-                    const rMax = ((4 - h) / 8) * 3.8; 
+                    const h = Math.random() * 8 - 4;
+                    const rMax = ((4 - h) / 8) * 3.8;
                     const r = Math.sqrt(Math.random()) * rMax;
                     const a = Math.random() * Math.PI * 2;
                     tS[i*3] = Math.cos(a) * r; tS[i*3+1] = h + 1; tS[i*3+2] = Math.sin(a) * r;
@@ -625,7 +725,7 @@
                     else if (Math.random() < SPARKLE_RATIO) leafSparkleIndices.push(i);
 
                 } else {
-                    const hTrunk = Math.random() * 2 - 5.5; 
+                    const hTrunk = Math.random() * 2 - 5.5;
                     const rTrunk = Math.random() * 0.6;
                     const aTrunk = Math.random() * Math.PI * 2;
 
@@ -657,7 +757,7 @@
             geo.setAttribute('tH', new THREE.BufferAttribute(tH, 3));
             geo.setAttribute('tG', new THREE.BufferAttribute(tG, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-            
+
             particles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.18, vertexColors: true, transparent: true, opacity: 0.85 }));
             mainGroup.add(particles);
 
@@ -889,29 +989,98 @@
         }
         // ====== END helpers ======
 
+        // ====== OK GESTURE (thumb + index tạo vòng tròn) ======
+        function _isOkGesture(lm) {
+            const s = _palmSize(lm);
+            if (!isFinite(s) || s < 1e-6) return false;
+
+            const d = _dist2(lm[4], lm[8]); // thumb tip - index tip
+
+            const upMiddle = lm[12].y < lm[10].y;
+            const upRing   = lm[16].y < lm[14].y;
+            const upPinky  = lm[20].y < lm[18].y;
+
+            // ngưỡng 0.42 dễ bắt hơn; muốn khó hơn thì giảm về 0.35
+            return (d < 0.42 * s) && upMiddle && upRing && upPinky;
+        }
+        // ====== END OK ======
+
+        // ===== OK LOVE TEXT: typewriter =====
+        function buildChars(el, text) {
+            el.innerHTML = "";
+            const frag = document.createDocumentFragment();
+
+            for (const ch of text) {
+                if (ch === " ") {
+                    const sp = document.createElement("span");
+                    sp.className = "ok-space";
+                    sp.innerHTML = "&nbsp;";
+                    frag.appendChild(sp);
+                } else {
+                    const s = document.createElement("span");
+                    s.className = "ok-char";
+                    s.textContent = ch;
+                    frag.appendChild(s);
+                }
+            }
+            el.appendChild(frag);
+            return el.querySelectorAll(".ok-char, .ok-space");
+        }
+
+        function playOkLoveText() {
+            const line1 = "Noel 2025 - 131 days with my baby";
+            const line2 = "Thank you for staying by my side. We've gone through joys and sorrows together, and you still chose to stay—that's the greatest honor and the luckiest thing in my life, love you";
+
+            const chars1 = buildChars(okLine1El, line1);
+            const chars2 = buildChars(okLine2El, line2);
+
+            if (okTextTL) okTextTL.kill();
+
+            okTextTL = gsap.timeline({ paused: true });
+            okTextTL
+                .set(okLoveEl, { display: "block" })
+                .to(okLoveEl, { opacity: 1, duration: 0.22, ease: "power2.out" })
+                .to("#ok-love .ok-line", { backgroundPosition: "260% 50%", duration: 2.2, ease: "none" }, 0)
+                .to(chars1, { opacity: 1, y: 0, duration: 0.06, ease: "power2.out", stagger: 0.03 }, 0.10)
+                .to(chars2, { opacity: 1, y: 0, duration: 0.06, ease: "power2.out", stagger: 0.018 }, ">0.18");
+
+            okTextTL.play(0);
+        }
+        // ===== END OK LOVE TEXT =====
+
         async function setupMediaPipe() {
             videoElement = document.getElementById('webcam');
             handTracker = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
 
-            // ✅ đổi sang 2 tay để bắt “heart bằng 2 tay”
+            // 2 tay để bắt “heart bằng 2 tay”
             handTracker.setOptions({ maxNumHands: 2, modelComplexity: 1 });
 
             handTracker.onResults(res => {
                 tHeart = 0;
                 tGalaxy = 0;
+                tOk = 0;
 
                 const hands = res.multiHandLandmarks;
 
-                // ✅ HEART MODE: 2 tay chụm tạo trái tim (ưu tiên cao nhất)
+                // 1) HEART: ưu tiên cao nhất (2 tay chụm)
                 if (hands && hands.length >= 2) {
                     if (_isTwoHandHeart(hands[0], hands[1])) {
                         tHeart = 1;
-                        tGalaxy = 0;
                         return;
                     }
                 }
 
-                // ✅ GALAXY MODE: giữ nguyên 1 tay giơ 3 ngón như cũ
+                // 2) OK: nếu bất kỳ tay nào làm OK => bật OK
+                if (hands && hands.length) {
+                    for (let i = 0; i < hands.length; i++) {
+                        if (_isOkGesture(hands[i])) {
+                            tOk = 1;
+                            return;
+                        }
+                    }
+                }
+
+                // 3) GALAXY: giữ nguyên 1 tay giơ 3 ngón
                 if (hands && hands[0]) {
                     const lm = hands[0];
                     const up1 = lm[8].y < lm[6].y;
@@ -920,7 +1089,7 @@
 
                     if (up1 && up2 && up3) {
                         tGalaxy = 1;
-                        tHeart = 0;
+                        return;
                     }
                 }
             });
@@ -936,15 +1105,35 @@
             const nowMs = performance.now();
             renderSnow(nowMs);
 
-            fHeart = THREE.MathUtils.lerp(fHeart, tHeart, 0.08);
-            fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
-
-            const isTree = (fHeart < 0.1 && fGalaxy < 0.1);
             const tt = nowMs * 0.001;
+
+            fHeart  = THREE.MathUtils.lerp(fHeart,  tHeart,  0.08);
+            fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
+            fOk     = THREE.MathUtils.lerp(fOk,     tOk,     0.12);
+
+            // Tree chỉ khi KHÔNG heart, KHÔNG galaxy, KHÔNG ok
+            const isTree = (fHeart < 0.1 && fGalaxy < 0.1 && fOk < 0.1);
 
             if (greetingEl) greetingEl.style.display = isTree ? 'block' : 'none';
 
-            mainGroup.rotation.y += 0.008; 
+            // OK LOVE TEXT show/hide + typewriter
+            const okOn  = (fOk > 0.78);
+            const okOff = (fOk < 0.25);
+
+            if (okOn && !okTextShown) {
+                okTextShown = true;
+                playOkLoveText();
+            }
+            if (okOff && okTextShown) {
+                okTextShown = false;
+                gsap.to(okLoveEl, {
+                    opacity: 0,
+                    duration: 0.18,
+                    onComplete: () => { okLoveEl.style.display = "none"; }
+                });
+            }
+
+            mainGroup.rotation.y += 0.008;
 
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
