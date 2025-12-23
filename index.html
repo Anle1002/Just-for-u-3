@@ -211,8 +211,8 @@
 
         function makeSnowflakes() {
             // DÀY HƠN: tự tính theo diện tích màn hình
-            const base = Math.floor((window.innerWidth * window.innerHeight) / 8000); // dày
-            const count = Math.max(110, Math.min(base, 280)); // clamp
+            const base = Math.floor((window.innerWidth * window.innerHeight) / 13000); // dày
+            const count = Math.max(50, Math.min(base, 130)); // clamp
 
             snowFlakes = [];
             for (let i = 0; i < count; i++) {
