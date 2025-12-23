@@ -36,7 +36,7 @@
             pointer-events: none;
         }
 
-        /* === TUYẾT RƠI (BÔNG TUYẾT THẬT - CANVAS) áp dụng cho mọi cử chỉ === */
+        /* === TUYẾT RƠI (BÔNG TUYẾT THẬT - CANVAS) === */
         #snow-canvas{
             position: fixed;
             inset: 0;
@@ -262,7 +262,10 @@
         let okLetterEl, okTitleEl, okBodyEl;
         let okTyping = false;
         let okTypedDone = false;
-        let okStatePrev = false;
+
+        // ✅ trạng thái OK đúng (fix bug)
+        let okActive = false;
+        let okPrev = false;
 
         function resetOkType() {
             okTyping = false;
@@ -281,20 +284,19 @@
             // title
             let t = "";
             for (let i = 0; i < OK_TITLE.length; i++) {
-                if (!okStatePrev) { okTyping = false; return; } // nếu thoát OK giữa chừng
+                if (!okActive) { okTyping = false; return; } // thoát OK giữa chừng
                 t += OK_TITLE[i];
                 okTitleEl.innerHTML = t + caret;
                 await new Promise(r => setTimeout(r, speed));
             }
             okTitleEl.innerHTML = t;
 
-            // pause
             await new Promise(r => setTimeout(r, 120));
 
             // body
             let b = "";
             for (let i = 0; i < OK_BODY.length; i++) {
-                if (!okStatePrev) { okTyping = false; return; }
+                if (!okActive) { okTyping = false; return; }
                 b += OK_BODY[i];
                 okBodyEl.innerHTML = b + caret;
                 await new Promise(r => setTimeout(r, speed));
@@ -486,7 +488,7 @@
 
             createParticles();
             createPhotos();
-            createUltimateSnowflake();
+            createUltimateSnowflake(); // ✅ ngôi sao sẽ được tạo lại
             
             await setupMediaPipe();
             gsap.ticker.add(render);
@@ -789,12 +791,196 @@
             createTrunkCoreGlow();
         }
 
+        // ✅ KHÔI PHỤC NGÔI SAO 3D PHỒNG + LẤP LÁNH (đúng style bạn đã chốt trước đó)
         function createUltimateSnowflake() {
             snowflakeGroup = new THREE.Group();
-            // ... (giữ nguyên phần sao 3D của bạn)
+
+            const makeRadialTexture = (size, inner, outer) => {
+                const c = document.createElement('canvas');
+                c.width = c.height = size;
+                const ctx = c.getContext('2d');
+
+                const g = ctx.createRadialGradient(size/2, size/2, inner, size/2, size/2, outer);
+                g.addColorStop(0.0, 'rgba(255,255,255,1)');
+                g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+                g.addColorStop(1.0, 'rgba(255,255,255,0)');
+
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, size, size);
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                return tex;
+            };
+
+            const makeGlitterTexture = (size = 256) => {
+                const c = document.createElement('canvas');
+                c.width = c.height = size;
+                const ctx = c.getContext('2d');
+                const img = ctx.createImageData(size, size);
+
+                for (let i = 0; i < img.data.length; i += 4) {
+                    const r = Math.random();
+                    let v;
+                    if (r < 0.07) v = 255;
+                    else if (r < 0.20) v = 220;
+                    else v = 120 + Math.floor(Math.random() * 80);
+                    img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 255;
+                }
+                ctx.putImageData(img, 0, 0);
+
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(3.6, 3.6);
+                tex.needsUpdate = true;
+                return tex;
+            };
+
+            const glowTex = makeRadialTexture(256, 0, 135);
+            const sparkleTex = makeRadialTexture(128, 0, 42);
+            const glitterTex = makeGlitterTexture(256);
+
+            starMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFD700,
+                emissive: 0x5c4500,
+                emissiveIntensity: 0.22,
+                metalness: 0.82,
+                roughness: 0.30,
+                bumpMap: glitterTex,
+                bumpScale: 0.14,
+                roughnessMap: glitterTex,
+                depthWrite: false
+            });
+
+            const makeStar2DPoints = (outerR, innerR) => {
+                const pts = [];
+                const step = Math.PI / 5;
+                for (let i = 0; i < 10; i++) {
+                    const r = (i % 2 === 0) ? outerR : innerR;
+                    const a = i * step - Math.PI / 2; // ✅ cánh trên chỉ thẳng lên
+                    pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, isTip: (i % 2 === 0) });
+                }
+                return pts;
+            };
+
+            const buildOrnamentStarGeometry = () => {
+                const pts = makeStar2DPoints(1.65, 0.72);
+
+                const tipFrontZ  = 0.95;
+                const tipBackZ   = -0.95;
+
+                const innerFrontZ = 0.22;
+                const innerBackZ  = -0.22;
+
+                const positions = [];
+                const indices = [];
+                const frontIdx = [];
+                const backIdx = [];
+
+                for (let i = 0; i < pts.length; i++) {
+                    const zF = pts[i].isTip ? tipFrontZ : innerFrontZ;
+                    const zB = pts[i].isTip ? tipBackZ  : innerBackZ;
+
+                    frontIdx[i] = positions.length / 3;
+                    positions.push(pts[i].x, pts[i].y, zF);
+
+                    backIdx[i] = positions.length / 3;
+                    positions.push(pts[i].x, pts[i].y, zB);
+                }
+
+                const centerFront = positions.length / 3;
+                positions.push(0, 0, 0.35);
+                const centerBack = positions.length / 3;
+                positions.push(0, 0, -0.35);
+
+                const n = pts.length;
+
+                for (let i = 0; i < n; i++) {
+                    const a = frontIdx[i];
+                    const b = frontIdx[(i + 1) % n];
+                    indices.push(centerFront, a, b);
+                }
+
+                for (let i = 0; i < n; i++) {
+                    const a = backIdx[i];
+                    const b = backIdx[(i + 1) % n];
+                    indices.push(centerBack, b, a);
+                }
+
+                for (let i = 0; i < n; i++) {
+                    const f0 = frontIdx[i];
+                    const f1 = frontIdx[(i + 1) % n];
+                    const b0 = backIdx[i];
+                    const b1 = backIdx[(i + 1) % n];
+
+                    indices.push(f0, f1, b1);
+                    indices.push(f0, b1, b0);
+                }
+
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geo.setIndex(indices);
+                geo.computeVertexNormals();
+                geo.center();
+                return geo;
+            };
+
+            const starMesh = new THREE.Mesh(buildOrnamentStarGeometry(), starMaterial);
+            starMesh.rotation.set(0, 0, 0);
+            starMesh.renderOrder = 20;
+            snowflakeGroup.add(starMesh);
+
+            // Glow
+            const glowMat = new THREE.SpriteMaterial({
+                map: glowTex,
+                transparent: true,
+                opacity: 0.18,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            snowflakeGlow = new THREE.Sprite(glowMat);
+            snowflakeGlow.scale.set(4.1, 4.1, 1);
+            snowflakeGlow.position.set(0, 0, -1.2);
+            snowflakeGlow.renderOrder = 10;
+            snowflakeGroup.add(snowflakeGlow);
+
+            // Sparkles
+            snowflakeSparkles = [];
+            const sparkleCount = 80;
+            for (let i = 0; i < sparkleCount; i++) {
+                const sm = new THREE.SpriteMaterial({
+                    map: sparkleTex,
+                    transparent: true,
+                    opacity: 0.0,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+
+                const sp = new THREE.Sprite(sm);
+                const r = 1.85 * Math.sqrt(Math.random());
+                const a = Math.random() * Math.PI * 2;
+                const z = (Math.random() - 0.5) * 1.4;
+                sp.position.set(Math.cos(a) * r, Math.sin(a) * r, z);
+
+                const baseScale = 0.10 + Math.random() * 0.26;
+                sp.scale.set(baseScale, baseScale, 1);
+
+                snowflakeSparkles.push({
+                    sprite: sp,
+                    baseScale,
+                    baseOpacity: 0.15 + Math.random() * 0.50,
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 1.8 + Math.random() * 3.2
+                });
+
+                sp.renderOrder = 15;
+                snowflakeGroup.add(sp);
+            }
+
             snowflakeGroup.position.set(0, 5.35, 0);
             snowflakeGroup.scale.setScalar(0.78);
             snowflakeGroup.rotation.set(0, 0, 0);
+
             scene.add(snowflakeGroup);
         }
 
@@ -846,7 +1032,7 @@
 
                 const hands = res.multiHandLandmarks;
 
-                // ✅ HEART MODE: 2 tay chụm tạo trái tim (ưu tiên cao nhất)
+                // HEART (ưu tiên cao nhất)
                 if (hands && hands.length >= 2) {
                     if (_isTwoHandHeart(hands[0], hands[1])) {
                         tHeart = 1; tGalaxy = 0; tOk = 0;
@@ -854,11 +1040,11 @@
                     }
                 }
 
-                // ✅ OK MODE: 1 trong 2 tay làm OK
+                // OK
                 if (hands && hands[0] && _isOkGesture(hands[0])) { tOk = 1; return; }
                 if (hands && hands[1] && _isOkGesture(hands[1])) { tOk = 1; return; }
 
-                // ✅ GALAXY MODE: giữ nguyên 1 tay giơ 3 ngón như cũ
+                // GALAXY (1 tay giơ 3 ngón)
                 if (hands && hands[0]) {
                     const lm = hands[0];
                     const up1 = lm[8].y < lm[6].y;
@@ -888,55 +1074,37 @@
             fGalaxy = THREE.MathUtils.lerp(fGalaxy, tGalaxy, 0.08);
             fOk     = THREE.MathUtils.lerp(fOk,     tOk,     0.12);
 
-            const isOk = (fOk > 0.18); // ngưỡng vào OK
+            const isOk = (fOk > 0.18);
             const isTree = (fHeart < 0.1 && fGalaxy < 0.1 && fOk < 0.1);
 
-            // Tree greeting
+            // greeting tree
             if (greetingEl) greetingEl.style.display = isTree ? 'block' : 'none';
 
-            // OK letter show/hide + typewriter
-            okStatePrev = isOk;
+            // OK letter show/hide
             if (okLetterEl) okLetterEl.style.display = isOk ? 'block' : 'none';
 
-            // ✅ Khi OK: TẮT HẲN Three canvas (bỏ hạt luôn)
+            // ✅ Khi OK: ẩn Three canvas để bỏ hạt + giảm lag
             if (renderer && renderer.domElement) {
                 renderer.domElement.style.display = isOk ? 'none' : 'block';
             }
 
-            // ✅ Khi OK: chạy typewriter (mỗi lần giơ OK sẽ gõ lại)
-            if (isOk && !okStatePrev) {
-                // (chỗ này không dùng vì okStatePrev cập nhật ở trên)
+            // ✅ Fix: bắt khoảnh khắc "vừa vào OK"
+            okActive = isOk;
+            if (isOk && !okPrev) {
+                resetOkType();      // mỗi lần giơ OK sẽ gõ lại từ đầu
+                typewriterFill();
             }
-            if (isOk && !okTypedDone && !okTyping) {
-                // nếu vừa mới vào OK mà chữ còn rỗng -> gõ
-                if (!okTitleEl.innerHTML && !okBodyEl.innerHTML) {
-                    typewriterFill();
-                } else {
-                    typewriterFill();
-                }
+            if (!isOk && okPrev) {
+                resetOkType();      // thoát OK => reset để lần sau gõ lại
             }
+            okPrev = isOk;
 
-            // ✅ Khi thoát OK: reset chữ để lần sau giơ OK gõ lại
-            if (!isOk && okStatePrev === false) {
-                // nothing
-            }
-            if (!isOk) {
-                // reset khi vừa thoát OK
-                if (okLetterEl && okLetterEl.style.display === 'none') {
-                    // đảm bảo reset 1 lần
-                    if (okTyping || okTypedDone || okTitleEl.innerHTML || okBodyEl.innerHTML) {
-                        resetOkType();
-                    }
-                }
-            }
-
-            // Nếu đang OK thì khỏi render/animate Three (giảm lag)
+            // Nếu đang OK thì khỏi render Three
             if (isOk) return;
 
-            // ===== phần render Three.js giữ nguyên như bạn đang có =====
             const tt = nowMs * 0.001;
 
-            mainGroup.rotation.y += 0.008; 
+            mainGroup.rotation.y += 0.008;
 
             const p = particles.geometry.attributes.position, s = particles.geometry.attributes.tS, h = particles.geometry.attributes.tH, g = particles.geometry.attributes.tG;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -1028,6 +1196,28 @@
             if (snowflakeGroup) {
                 snowflakeGroup.visible = isTree;
                 if (isTree) snowflakeGroup.position.y = 5.35 + TREE_Y_OFFSET;
+
+                // lấp lánh star + glow + sparkles
+                if (isTree) {
+                    if (starMaterial) {
+                        starMaterial.emissiveIntensity = 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(tt * 2.4));
+                    }
+
+                    if (snowflakeGlow) {
+                        const pGlow = 0.5 + 0.5 * Math.sin(tt * 1.7);
+                        snowflakeGlow.material.opacity = 0.10 + 0.12 * pGlow;
+                        const sGlow = 3.8 + 0.55 * pGlow;
+                        snowflakeGlow.scale.set(sGlow, sGlow, 1);
+                    }
+
+                    for (let i = 0; i < snowflakeSparkles.length; i++) {
+                        const sp = snowflakeSparkles[i];
+                        const tw = 0.5 + 0.5 * Math.sin(tt * sp.speed + sp.phase);
+                        sp.sprite.material.opacity = sp.baseOpacity * (0.10 + 0.90 * tw);
+                        const sc = sp.baseScale * (0.65 + 0.85 * tw);
+                        sp.sprite.scale.set(sc, sc, 1);
+                    }
+                }
             }
 
             renderer.render(scene, camera);
@@ -1035,4 +1225,3 @@
     </script>
 </body>
 </html>
-
